@@ -3,7 +3,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import api from "../../services/api";
 import RecordForm from "./RecordForm";
 import Modal from "./Modal";
-import HighlightText from "../../utils/highlightText";
+import HighlightText from "../../utils/HighlightText";
 import {
   createEmptyRecord,
   formatToothFindings,
