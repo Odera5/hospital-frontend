@@ -10,25 +10,53 @@ import SearchFilterSort from "../components/PatientRecord/SearchFilterSort";
 import { createEmptyRecord } from "../components/PatientRecord/recordUtils";
 import { getEntityId } from "../utils/entityId";
 
+const RECORDS_PER_PAGE = 10;
+
 export default function PatientRecord() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const storedUser = JSON.parse(localStorage.getItem("user")) || {};
+  const canEditPatient =
+    storedUser.role === "admin" || storedUser.role === "doctor";
 
   const [patient, setPatient] = useState(null);
   const [records, setRecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [patientForm, setPatientForm] = useState({
+    name: "",
+    cardNumber: "",
+    age: "",
+    gender: "other",
+    phone: "",
+    email: "",
+    address: "",
+  });
 
   const [newRecord, setNewRecord] = useState(createEmptyRecord());
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditPatientModal, setShowEditPatientModal] = useState(false);
   const [expandedRecordId, setExpandedRecordId] = useState(null);
   const [toast, setToast] = useState(null);
   const [addLoading, setAddLoading] = useState(false);
+  const [patientSaveLoading, setPatientSaveLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const showToast = (message, type = "success") =>
     setToast({ message, type });
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredRecords.length / RECORDS_PER_PAGE),
+  );
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const pageStartIndex = (currentPageSafe - 1) * RECORDS_PER_PAGE;
+  const paginatedRecords = filteredRecords.slice(
+    pageStartIndex,
+    pageStartIndex + RECORDS_PER_PAGE,
+  );
 
   // ---------------- Helper: Convert record object to FormData ----------------
   const createFormData = (recordData, removedAttachments = []) => {
@@ -65,6 +93,15 @@ export default function PatientRecord() {
         });
 
         setPatient(resPatient.data);
+        setPatientForm({
+          name: resPatient.data?.name || "",
+          cardNumber: resPatient.data?.cardNumber || "",
+          age: resPatient.data?.age || "",
+          gender: resPatient.data?.gender || "other",
+          phone: resPatient.data?.phone || "",
+          email: resPatient.data?.email || "",
+          address: resPatient.data?.address || "",
+        });
 
         const resRecords = await api.get(`/patients/${id}/records`, {
         });
@@ -153,6 +190,94 @@ export default function PatientRecord() {
     }
   };
 
+  const handlePatientFormChange = (e) => {
+    const { name, value } = e.target;
+    setPatientForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const openEditPatientModal = () => {
+    if (!patient) return;
+
+    setPatientForm({
+      name: patient.name || "",
+      cardNumber: patient.cardNumber || "",
+      age: patient.age || "",
+      gender: patient.gender || "other",
+      phone: patient.phone || "",
+      email: patient.email || "",
+      address: patient.address || "",
+    });
+    setShowEditPatientModal(true);
+  };
+
+  const handleUpdatePatient = async (e) => {
+    e.preventDefault();
+
+    if (!patientForm.name.trim()) {
+      showToast("Patient name cannot be empty.", "error");
+      return;
+    }
+
+    if (!patientForm.age || Number(patientForm.age) <= 0) {
+      showToast("Age must be greater than 0.", "error");
+      return;
+    }
+
+    if (
+      patientForm.email &&
+      !/\S+@\S+\.\S+/.test(patientForm.email)
+    ) {
+      showToast("Invalid email address.", "error");
+      return;
+    }
+
+    try {
+      setPatientSaveLoading(true);
+
+      const payload = {
+        name: patientForm.name.trim(),
+        cardNumber: patientForm.cardNumber.trim(),
+        age: patientForm.age.toString(),
+        gender: patientForm.gender || "other",
+        phone: patientForm.phone.trim(),
+        email: patientForm.email.trim(),
+        address: patientForm.address.trim(),
+      };
+
+      const res = await api.put(`/patients/${id}`, payload);
+      setPatient(res.data);
+      setPatientForm({
+        name: res.data?.name || "",
+        cardNumber: res.data?.cardNumber || "",
+        age: res.data?.age || "",
+        gender: res.data?.gender || "other",
+        phone: res.data?.phone || "",
+        email: res.data?.email || "",
+        address: res.data?.address || "",
+      });
+      setShowEditPatientModal(false);
+      showToast("Patient information updated successfully!");
+    } catch (err) {
+      console.error(err);
+      showToast(
+        err.response?.data?.message || "Failed to update patient information",
+        "error",
+      );
+    } finally {
+      setPatientSaveLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredRecords.length, searchKeyword]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   // ---------------- Render ----------------
   if (loading)
     return <p className="p-6">Loading patient data...</p>;
@@ -186,16 +311,29 @@ export default function PatientRecord() {
         {patient.name}'s Records
       </h1>
 
-      <p className="text-gray-600 mb-4">
-        Age: {patient.age}
-      </p>
+      <div className="mb-4 space-y-1 text-gray-600">
+        <p>Age: {patient.age}</p>
+        <p>Sex: {patient.gender || "Not specified"}</p>
+        <p>Phone: {patient.phone || "No phone number"}</p>
+      </div>
 
-      <button
-        onClick={() => setShowAddModal(true)}
-        className="mb-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-      >
-        Add New Record
-      </button>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+        {canEditPatient && (
+          <button
+            onClick={openEditPatientModal}
+            className="bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700"
+          >
+            Edit Patient Info
+          </button>
+        )}
+
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Add New Record
+        </button>
+      </div>
 
       <SearchFilterSort
         records={records}
@@ -206,22 +344,56 @@ export default function PatientRecord() {
       />
 
       {/* SIMPLE NORMAL RENDER — NO VIRTUALIZATION */}
-      <div className="bg-white p-6 rounded shadow-md max-h-[70vh] overflow-auto">
-        {filteredRecords.length === 0 ? (
-          <p>No records found.</p>
-        ) : (
-          filteredRecords.map((record) => (
-            <RecordItem
-              patientId={id}
-              key={getEntityId(record)}
-              record={record}
-              expandedRecordId={expandedRecordId}
-              setExpandedRecordId={setExpandedRecordId}
-              handleDelete={handleDeleteRecord}
-              handleSaveEdit={handleSaveEdit}
-              searchKeyword={searchKeyword}
-            />
-          ))
+      <div className="space-y-4 rounded bg-white p-6 shadow-md">
+        <div className="max-h-[70vh] overflow-auto">
+          {filteredRecords.length === 0 ? (
+            <p>No records found.</p>
+          ) : (
+            paginatedRecords.map((record) => (
+              <RecordItem
+                patientId={id}
+                key={getEntityId(record)}
+                record={record}
+                expandedRecordId={expandedRecordId}
+                setExpandedRecordId={setExpandedRecordId}
+                handleDelete={handleDeleteRecord}
+                handleSaveEdit={handleSaveEdit}
+                searchKeyword={searchKeyword}
+              />
+            ))
+          )}
+        </div>
+
+        {filteredRecords.length > 0 && (
+          <div className="flex flex-col gap-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              Showing {pageStartIndex + 1}-
+              {Math.min(pageStartIndex + RECORDS_PER_PAGE, filteredRecords.length)} of{" "}
+              {filteredRecords.length} records
+            </p>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={currentPageSafe === 1}
+                className="rounded border border-gray-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="font-medium text-gray-700">
+                Page {currentPageSafe} of {totalPages}
+              </span>
+              <button
+                onClick={() =>
+                  setCurrentPage((page) => Math.min(totalPages, page + 1))
+                }
+                disabled={currentPageSafe === totalPages}
+                className="rounded border border-gray-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -247,6 +419,123 @@ export default function PatientRecord() {
             submitLabel={addLoading ? "Adding..." : "Add Record"}
             loading={addLoading}
           />
+        </Modal>
+      )}
+
+      {showEditPatientModal && (
+        <Modal onClose={() => setShowEditPatientModal(false)}>
+          <h2 className="text-xl font-semibold mb-4">Edit Patient Information</h2>
+
+          <form onSubmit={handleUpdatePatient} className="space-y-4">
+            <div>
+              <label className="mb-1 block font-medium">Name</label>
+              <input
+                type="text"
+                name="name"
+                value={patientForm.name}
+                onChange={handlePatientFormChange}
+                className="w-full rounded border px-3 py-2"
+                disabled={patientSaveLoading}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block font-medium">Patient Card Number</label>
+              <input
+                type="text"
+                name="cardNumber"
+                value={patientForm.cardNumber}
+                onChange={handlePatientFormChange}
+                className="w-full rounded border px-3 py-2"
+                disabled={patientSaveLoading}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block font-medium">Age</label>
+                <input
+                  type="number"
+                  name="age"
+                  value={patientForm.age}
+                  onChange={handlePatientFormChange}
+                  className="w-full rounded border px-3 py-2"
+                  disabled={patientSaveLoading}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block font-medium">Sex</label>
+                <select
+                  name="gender"
+                  value={patientForm.gender}
+                  onChange={handlePatientFormChange}
+                  className="w-full rounded border px-3 py-2"
+                  disabled={patientSaveLoading}
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block font-medium">Phone</label>
+                <input
+                  type="text"
+                  name="phone"
+                  value={patientForm.phone}
+                  onChange={handlePatientFormChange}
+                  className="w-full rounded border px-3 py-2"
+                  disabled={patientSaveLoading}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block font-medium">Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={patientForm.email}
+                  onChange={handlePatientFormChange}
+                  className="w-full rounded border px-3 py-2"
+                  disabled={patientSaveLoading}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block font-medium">Address</label>
+              <input
+                type="text"
+                name="address"
+                value={patientForm.address}
+                onChange={handlePatientFormChange}
+                className="w-full rounded border px-3 py-2"
+                disabled={patientSaveLoading}
+              />
+            </div>
+
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowEditPatientModal(false)}
+                className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600"
+                disabled={patientSaveLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="rounded bg-amber-600 px-4 py-2 text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={patientSaveLoading}
+              >
+                {patientSaveLoading ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

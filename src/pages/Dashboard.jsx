@@ -4,6 +4,8 @@ import api, { logoutCurrentUser } from "../services/api";
 import Toast from "../components/Toast";
 import { getEntityId } from "../utils/entityId";
 
+const PATIENTS_PER_PAGE = 25;
+
 const formatLocalDateKey = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);
   const year = date.getFullYear();
@@ -45,6 +47,7 @@ export default function Dashboard() {
   const [currentDay, setCurrentDay] = useState(formatLocalDateKey());
   const [currentTime, setCurrentTime] = useState(new Date());
   const [authChecked, setAuthChecked] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const showToast = (message, type = "success") => setToast({ message, type });
 
@@ -222,6 +225,25 @@ export default function Dashboard() {
     .filter((p) => p && p.name)
     .filter(matchesPatientSearch);
 
+  const activeList = showTrash ? filteredTrash : filteredPatients;
+  const totalPages = Math.max(1, Math.ceil(activeList.length / PATIENTS_PER_PAGE));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const pageStartIndex = (currentPageSafe - 1) * PATIENTS_PER_PAGE;
+  const paginatedPatients = activeList.slice(
+    pageStartIndex,
+    pageStartIndex + PATIENTS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, showTrash, sortConfig]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   // Soft delete
   const handleDelete = async (patientId) => {
     if (!window.confirm("Move this patient to Trash?")) return;
@@ -289,7 +311,7 @@ export default function Dashboard() {
   const formattedDate = currentTime.toLocaleDateString();
 
   return (
-    <div className="min-h-screen bg-gray-100 p-3 sm:p-4 lg:p-6">
+    <div className="flex min-h-screen flex-col bg-gray-100 p-3 sm:p-4 lg:p-6">
       {toast && (
         <Toast
           message={toast.message}
@@ -299,192 +321,226 @@ export default function Dashboard() {
         />
       )}
 
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-500">
-            BHF by PrimuxCare
-          </p>
-          <h1 className="text-xl font-bold sm:text-2xl">Welcome, {user.name}</h1>
-          <p className="flex flex-wrap items-center gap-2 text-sm text-gray-600 sm:gap-4">
-            Role: {user.role} <span className="text-gray-400">|</span>{" "}
-            {formattedDate} {formattedTime}
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          {(user.role === "admin" ||
-            user.role === "nurse" ||
-            user.role === "doctor") && (
-            <>
-              {user.role === "admin" && (
-                <button
-                  onClick={() => navigate("/signup")}
-                  className="rounded bg-purple-600 px-4 py-2 text-sm text-white hover:bg-purple-700"
-                >
-                  Manage Staff
-                </button>
-              )}
-              <button
-                onClick={() => navigate("/register-patient")}
-                className="rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
-              >
-                Register Patient
-              </button>
-              <button
-                onClick={() => navigate("/appointments")}
-                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-              >
-                Appointments
-              </button>
-              <button
-                onClick={() => navigate("/waiting-room")}
-                className="rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
-              >
-                Waiting Room
-              </button>
-              <button
-                onClick={() => navigate("/billing")}
-                className="rounded bg-orange-600 px-4 py-2 text-sm text-white hover:bg-orange-700"
-              >
-                Billing
-              </button>
-            </>
-          )}
-          <button
-            onClick={handleLogout}
-            className="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
-          >
-            Logout
-          </button>
-          {user.role === "admin" && (
-            <button
-              onClick={() => setShowTrash(!showTrash)}
-              className="rounded bg-gray-600 px-4 py-2 text-white hover:bg-gray-700"
-            >
-              {showTrash ? "Back to Patients" : "Trash"}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {!showTrash && (
-        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded bg-white p-4 text-center shadow">
-            <h3 className="text-gray-500 text-sm">Patients Registered Today</h3>
-            <p className="text-2xl font-bold">{patientsToday.length}</p>
-          </div>
-          <div className="rounded bg-white p-4 text-center shadow">
-            <h3 className="text-gray-500 text-sm">Appointments Today</h3>
-            <p className="text-2xl font-bold">{appointmentsToday}</p>
-          </div>
-          <div className="rounded bg-white p-4 text-center shadow">
-            <h3 className="text-gray-500 text-sm">Waiting Patients</h3>
-            <p className="text-2xl font-bold">{waitingSummary.waiting}</p>
-          </div>
-          <div className="rounded bg-white p-4 text-center shadow">
-            <h3 className="text-gray-500 text-sm">Monthly Revenue</h3>
-            <p className="text-2xl font-bold">
-              NGN {monthlyRevenue.toLocaleString()}
+      <div className="flex-1">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-xl font-bold sm:text-2xl">Welcome, {user.name}</h1>
+            <p className="flex flex-wrap items-center gap-2 text-sm text-gray-600 sm:gap-4">
+              Role: {user.role} <span className="text-gray-400">|</span>{" "}
+              {formattedDate} {formattedTime}
             </p>
           </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+            {(user.role === "admin" ||
+              user.role === "nurse" ||
+              user.role === "doctor") && (
+              <>
+                {user.role === "admin" && (
+                  <button
+                    onClick={() => navigate("/signup")}
+                    className="rounded bg-purple-600 px-4 py-2 text-sm text-white hover:bg-purple-700"
+                  >
+                    Manage Staff
+                  </button>
+                )}
+                <button
+                  onClick={() => navigate("/register-patient")}
+                  className="rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
+                >
+                  Register Patient
+                </button>
+                <button
+                  onClick={() => navigate("/appointments")}
+                  className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                >
+                  Appointments
+                </button>
+                <button
+                  onClick={() => navigate("/waiting-room")}
+                  className="rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
+                >
+                  Waiting Room
+                </button>
+                <button
+                  onClick={() => navigate("/billing")}
+                  className="rounded bg-orange-600 px-4 py-2 text-sm text-white hover:bg-orange-700"
+                >
+                  Billing
+                </button>
+              </>
+            )}
+            <button
+              onClick={handleLogout}
+              className="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+            >
+              Logout
+            </button>
+            {user.role === "admin" && (
+              <button
+                onClick={() => setShowTrash(!showTrash)}
+                className="rounded bg-gray-600 px-4 py-2 text-white hover:bg-gray-700"
+              >
+                {showTrash ? "Back to Patients" : "Trash"}
+              </button>
+            )}
+          </div>
         </div>
-      )}
 
-      <input
-        type="text"
-        placeholder="Search patients by name or card number..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="mb-4 w-full rounded border px-3 py-2"
-      />
-
-      <div className="rounded bg-white p-4 shadow sm:p-6">
-        <h2 className="text-xl font-semibold mb-4">
-          {showTrash ? "Trash" : "Patients"}
-        </h2>
-
-        {loading ? (
-          <p className="text-center text-gray-500">Loading patients...</p>
-        ) : (showTrash ? filteredTrash : filteredPatients).length === 0 ? (
-          <p className="text-gray-500">
-            {showTrash ? "No trashed patients." : "No patients found."}
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-[640px] w-full border border-gray-300">
-              <thead className="bg-gray-200">
-                <tr>
-                  <th
-                    onClick={() => requestSort("name")}
-                    className="cursor-pointer border px-4 py-2"
-                  >
-                    Name
-                  </th>
-                  <th
-                    onClick={() => requestSort("age")}
-                    className="cursor-pointer border px-4 py-2"
-                  >
-                    Age
-                  </th>
-                  <th className="border px-4 py-2">Card Number</th>
-                  <th className="border px-4 py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(showTrash ? filteredTrash : filteredPatients).map((p) => {
-                  const patientId = getEntityId(p);
-                  const isToday = patientsToday.some(
-                    (todayPatient) => getEntityId(todayPatient) === patientId,
-                  );
-                  return (
-                    <tr
-                      key={patientId}
-                      className={`text-center ${!showTrash && isToday ? "bg-green-100 font-semibold" : ""}`}
-                    >
-                      <td className="border px-4 py-2">{p.name}</td>
-                      <td className="border px-4 py-2">{p.age}</td>
-                      <td className="border px-4 py-2">{p.cardNumber || "--"}</td>
-                      <td className="border px-4 py-2">
-                        {!showTrash && (
-                          <button
-                            onClick={() => handleViewRecords(patientId)}
-                            className="mr-2 rounded bg-blue-600 px-2 py-1 text-white"
-                          >
-                            View Records
-                          </button>
-                        )}
-                        {showTrash ? (
-                          <div className="flex justify-center gap-2">
-                            <button
-                              onClick={() => handleRestore(patientId)}
-                              className="rounded bg-green-600 px-2 py-1 text-white"
-                            >
-                              Restore
-                            </button>
-                            <button
-                              onClick={() => handlePermanentDelete(patientId)}
-                              className="rounded bg-red-700 px-2 py-1 text-white"
-                            >
-                              Delete Permanently
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleDelete(patientId)}
-                            className="rounded bg-red-600 px-2 py-1 text-white"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {!showTrash && (
+          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded bg-white p-4 text-center shadow">
+              <h3 className="text-gray-500 text-sm">Patients Registered Today</h3>
+              <p className="text-2xl font-bold">{patientsToday.length}</p>
+            </div>
+            <div className="rounded bg-white p-4 text-center shadow">
+              <h3 className="text-gray-500 text-sm">Appointments Today</h3>
+              <p className="text-2xl font-bold">{appointmentsToday}</p>
+            </div>
+            <div className="rounded bg-white p-4 text-center shadow">
+              <h3 className="text-gray-500 text-sm">Waiting Patients</h3>
+              <p className="text-2xl font-bold">{waitingSummary.waiting}</p>
+            </div>
+            <div className="rounded bg-white p-4 text-center shadow">
+              <h3 className="text-gray-500 text-sm">Monthly Revenue</h3>
+              <p className="text-2xl font-bold">
+                NGN {monthlyRevenue.toLocaleString()}
+              </p>
+            </div>
           </div>
         )}
+
+        <input
+          type="text"
+          placeholder="Search patients by name or card number..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="mb-4 w-full rounded border px-3 py-2"
+        />
+
+        <div className="rounded bg-white p-4 shadow sm:p-6">
+          <h2 className="text-xl font-semibold mb-4">
+            {showTrash ? "Trash" : "Patients"}
+          </h2>
+
+          {loading ? (
+            <p className="text-center text-gray-500">Loading patients...</p>
+          ) : activeList.length === 0 ? (
+            <p className="text-gray-500">
+              {showTrash ? "No trashed patients." : "No patients found."}
+            </p>
+          ) : (
+            <div className="space-y-4">
+              <div className="overflow-x-auto">
+                <table className="min-w-[640px] w-full border border-gray-300">
+                  <thead className="bg-gray-200">
+                    <tr>
+                      <th
+                        onClick={() => requestSort("name")}
+                        className="cursor-pointer border px-4 py-2"
+                      >
+                        Name
+                      </th>
+                      <th
+                        onClick={() => requestSort("age")}
+                        className="cursor-pointer border px-4 py-2"
+                      >
+                        Age
+                      </th>
+                      <th className="border px-4 py-2">Card Number</th>
+                      <th className="border px-4 py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedPatients.map((p) => {
+                      const patientId = getEntityId(p);
+                      const isToday = patientsToday.some(
+                        (todayPatient) => getEntityId(todayPatient) === patientId,
+                      );
+                      return (
+                        <tr
+                          key={patientId}
+                          className={`text-center ${!showTrash && isToday ? "bg-green-100 font-semibold" : ""}`}
+                        >
+                          <td className="border px-4 py-2">{p.name}</td>
+                          <td className="border px-4 py-2">{p.age}</td>
+                          <td className="border px-4 py-2">{p.cardNumber || "--"}</td>
+                          <td className="border px-4 py-2">
+                            {!showTrash && (
+                              <button
+                                onClick={() => handleViewRecords(patientId)}
+                                className="mr-2 rounded bg-blue-600 px-2 py-1 text-white"
+                              >
+                                View Records
+                              </button>
+                            )}
+                            {showTrash ? (
+                              <div className="flex justify-center gap-2">
+                                <button
+                                  onClick={() => handleRestore(patientId)}
+                                  className="rounded bg-green-600 px-2 py-1 text-white"
+                                >
+                                  Restore
+                                </button>
+                                <button
+                                  onClick={() => handlePermanentDelete(patientId)}
+                                  className="rounded bg-red-700 px-2 py-1 text-white"
+                                >
+                                  Delete Permanently
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleDelete(patientId)}
+                                className="rounded bg-red-600 px-2 py-1 text-white"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex flex-col gap-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+                <p>
+                  Showing {pageStartIndex + 1}-{Math.min(pageStartIndex + PATIENTS_PER_PAGE, activeList.length)} of{" "}
+                  {activeList.length} {showTrash ? "trashed patients" : "patients"}
+                </p>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    disabled={currentPageSafe === 1}
+                    className="rounded border border-gray-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="font-medium text-gray-700">
+                    Page {currentPageSafe} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((page) => Math.min(totalPages, page + 1))
+                    }
+                    disabled={currentPageSafe === totalPages}
+                    className="rounded border border-gray-300 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+
+      <p className="pt-6 text-center text-xs font-semibold uppercase tracking-[0.25em] text-gray-500">
+        BHF by PrimuxCare
+      </p>
     </div>
   );
 }
