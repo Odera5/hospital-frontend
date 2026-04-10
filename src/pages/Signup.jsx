@@ -119,7 +119,7 @@ export default function Signup() {
           <div>
             <h1 className="text-2xl font-semibold">Manage Staff</h1>
             <p className="text-sm text-gray-600">
-              Only admin-created active staff accounts can log in.
+              Only admin-created, verified, and active staff accounts can log in.
             </p>
           </div>
 

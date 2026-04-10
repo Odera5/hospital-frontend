@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import api from "../services/api";
 
 const initialForm = {
@@ -17,7 +17,7 @@ export default function RegisterClinic() {
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
+  const [success, setSuccess] = useState("");
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -28,16 +28,15 @@ export default function RegisterClinic() {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const response = await api.post("/auth/register-clinic", form);
-      const { accessToken, refreshToken, user } = response.data;
-
-      localStorage.setItem("accessToken", accessToken);
-      localStorage.setItem("refreshToken", refreshToken);
-      localStorage.setItem("user", JSON.stringify(user));
-
-      navigate("/dashboard");
+      setSuccess(
+        response.data?.message ||
+          "Clinic registered successfully. Please check the admin email inbox to confirm the address and activate the account.",
+      );
+      setForm(initialForm);
     } catch (err) {
       console.error("Clinic registration error:", err);
       setError(
@@ -65,8 +64,9 @@ export default function RegisterClinic() {
             </h1>
             <p className="mt-4 max-w-lg text-sm text-slate-200">
               Each clinic gets its own staff accounts and patient data space. Once
-              you finish registration, you can log in immediately and start adding
-              your team. Only staff accounts created by that clinic admin can sign in.
+              you finish registration, the admin email receives a verification link
+              to activate the account before signing in. Only staff accounts created
+              by that clinic admin can sign in.
             </p>
 
             <div className="mt-8 space-y-4 text-sm text-slate-200">
@@ -106,6 +106,11 @@ export default function RegisterClinic() {
             {error && (
               <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
+              </p>
+            )}
+            {success && (
+              <p className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                {success}
               </p>
             )}
 

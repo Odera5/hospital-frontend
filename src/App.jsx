@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 import Login from "./pages/Login";
 import RegisterClinic from "./pages/RegisterClinic";
+import VerifyEmail from "./pages/VerifyEmail";
 import Signup from "./pages/Signup";
 import ClinicSettings from "./pages/ClinicSettings";
 import Dashboard from "./pages/Dashboard";
@@ -28,6 +29,7 @@ function App() {
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register-clinic" element={<RegisterClinic />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/support" element={<Support />} />
         <Route
           path="/signup"

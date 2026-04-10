@@ -6,12 +6,18 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const navigate = useNavigate();
+  const canResendVerification =
+    error ===
+    "Please confirm your email address to activate your account before signing in.";
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
 
     try {
@@ -43,6 +49,39 @@ export default function Login() {
     }
   };
 
+  const handleResendVerification = async () => {
+    if (!email.trim()) {
+      setError("Enter your email address first so we know where to send the verification link.");
+      return;
+    }
+
+    try {
+      setResending(true);
+      setError("");
+      setSuccess("");
+
+      const response = await api.post("/auth/resend-verification", {
+        email,
+      });
+
+      setSuccess(
+        response.data?.message ||
+          "A new verification email has been sent. Please check your inbox and spam folder.",
+      );
+    } catch (err) {
+      console.error(
+        "Resend verification error:",
+        err.response?.data || err.message || err,
+      );
+      setError(
+        err.response?.data?.message ||
+          "We could not resend the verification email.",
+      );
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
@@ -55,6 +94,7 @@ export default function Login() {
         </p>
 
         {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+        {success && <p className="text-green-600 text-sm mb-3">{success}</p>}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
@@ -97,6 +137,20 @@ export default function Login() {
             {loading ? "Logging in..." : "Login"}
           </button>
         </form>
+
+        {canResendVerification && (
+          <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p>Need another confirmation email?</p>
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resending}
+              className="mt-2 font-medium text-amber-700 hover:text-amber-800 disabled:text-amber-400"
+            >
+              {resending ? "Sending..." : "Resend verification email"}
+            </button>
+          </div>
+        )}
 
         <div className="mt-5 rounded-lg bg-blue-50 px-4 py-3 text-sm text-gray-700">
           <p className="font-medium text-gray-900">New clinic?</p>
