@@ -14,6 +14,7 @@ function RecordItem({
   handleSaveEdit,
   searchKeyword,
   virtualizer,
+  canManageRecords = false,
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editingRecordData, setEditingRecordData] = useState({
@@ -173,23 +174,25 @@ function RecordItem({
             {record.createdAt ? new Date(record.createdAt).toLocaleString() : "-"}
           </p>
 
-          <div className="flex space-x-2 mt-2">
-            <button
-              onClick={() => setIsEditing(true)}
-              className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-            >
-              Edit
-            </button>
+          {canManageRecords && (
+            <div className="flex space-x-2 mt-2">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+              >
+                Edit
+              </button>
 
-            <button
-              onClick={() => handleDelete(recordId)}
-              className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-            >
-              Delete
-            </button>
-          </div>
+              <button
+                onClick={() => handleDelete(recordId)}
+                className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          )}
 
-          {isEditing && (
+          {isEditing && canManageRecords && (
             <Modal onClose={cancelEditing}>
               <h2 className="text-xl font-semibold mb-4">Edit Record</h2>
               <RecordForm

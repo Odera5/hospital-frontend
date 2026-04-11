@@ -5,6 +5,9 @@ import AppointmentForm from "./AppointmentForm";
 import { getEntityId } from "../../utils/entityId";
 
 export default function AppointmentSchedule({ patientId = null }) {
+  const storedUser = JSON.parse(localStorage.getItem("user")) || {};
+  const canCompleteAppointment =
+    storedUser.role === "admin" || storedUser.role === "doctor";
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -228,12 +231,14 @@ export default function AppointmentSchedule({ patientId = null }) {
                 <div className="flex gap-2 ml-4">
                   {canModifyAppointment(appointment.status) ? (
                     <>
-                      <button
-                        onClick={() => handleComplete(getEntityId(appointment))}
-                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
-                      >
-                        Mark Completed
-                      </button>
+                      {canCompleteAppointment && (
+                        <button
+                          onClick={() => handleComplete(getEntityId(appointment))}
+                          className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                        >
+                          Mark Completed
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setEditingAppointment(appointment);

@@ -72,7 +72,9 @@ export default function AppointmentForm({
     try {
       setSlotLoading(true);
       const response = await api.get(
-        `/appointments/available-slots?date=${formData.appointmentDate}&duration=${formData.duration}`,
+        `/appointments/available-slots?date=${formData.appointmentDate}&duration=${formData.duration}${
+          appointment ? `&appointmentId=${getEntityId(appointment)}` : ""
+        }`,
       );
       setAvailableSlots(response.data.availableSlots);
       setFormData((prev) => ({
@@ -344,6 +346,9 @@ export default function AppointmentForm({
               step="15"
               className="w-full border border-gray-300 rounded p-2"
             />
+            <p className="mt-1 text-sm text-gray-500">
+              Longer visits now block overlapping time slots automatically.
+            </p>
           </div>
 
           {patientMode === "new" && !patientId && (

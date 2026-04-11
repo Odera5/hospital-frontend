@@ -28,11 +28,15 @@ export default function WaitingRoomBoard({
   preselectPatientId = "",
 }) {
   const navigate = useNavigate();
+  const storedUser = JSON.parse(localStorage.getItem("user")) || {};
+  const isFrontDesk = storedUser.role === "nurse";
   const [entries, setEntries] = useState([]);
   const [patients, setPatients] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [patientSearchQuery, setPatientSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedPatient, setSelectedPatient] = useState("");
+  const [patientPickerOpen, setPatientPickerOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
@@ -99,6 +103,8 @@ export default function WaitingRoomBoard({
         notes,
       });
       setSelectedPatient("");
+      setPatientSearchQuery("");
+      setPatientPickerOpen(false);
       setNotes("");
       showToast("Patient added to waiting room", "success");
       fetchQueue();
@@ -112,12 +118,18 @@ export default function WaitingRoomBoard({
 
   const handleOpenRecord = (patientId) => {
     if (!patientId) return;
-    navigate(`/patients/${patientId}/records`);
+    navigate(`/patients/${patientId}/records`, {
+      state: { returnTo: "/waiting-room" },
+    });
   };
 
   const handleStatusUpdate = async (item) => {
     const nextStatus = NEXT_ACTION[item.status];
     if (!nextStatus) return;
+    if (isFrontDesk && nextStatus !== "called") {
+      showToast("Front desk can only move patients to Called.", "error");
+      return;
+    }
 
     try {
       await api.put(`/waiting-room/${getEntityId(item)}`, { status: nextStatus });
@@ -157,6 +169,25 @@ export default function WaitingRoomBoard({
 
   const sectionItems = (status) =>
     entries.filter((entry) => entry.status === status);
+
+  const filteredPatients = patients.filter((patient) => {
+    const query = patientSearchQuery.trim().toLowerCase();
+    if (!query) return true;
+
+    const searchableText = [
+      patient?.name,
+      patient?.cardNumber,
+      patient?.phone,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return searchableText.includes(query);
+  });
+
+  const selectedPatientDetails =
+    patients.find((patient) => getEntityId(patient) === selectedPatient) || null;
 
   const formatDate = (value) => {
     if (!value) return "--";
@@ -211,14 +242,16 @@ export default function WaitingRoomBoard({
               >
                 Prepare Queue Entry
               </button>
-              <button
-                onClick={() =>
-                  handleOpenRecord(getEntityId(newPatient))
-                }
-                className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-              >
-                Open Patient Record
-              </button>
+              {!isFrontDesk && (
+                <button
+                  onClick={() =>
+                    handleOpenRecord(getEntityId(newPatient))
+                  }
+                  className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                >
+                  Open Patient Record
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -256,18 +289,69 @@ export default function WaitingRoomBoard({
           <label className="block text-sm font-semibold mb-2">
             Add to Waiting Room
           </label>
-          <select
-            value={selectedPatient}
-            onChange={(e) => setSelectedPatient(e.target.value)}
-            className="w-full border border-gray-300 rounded p-2 mb-3"
-          >
-            <option value="">Select existing patient</option>
-            {patients.map((patient) => (
-              <option key={getEntityId(patient)} value={getEntityId(patient)}>
-                {[patient.name, patient.phone || "no phone"].join(" | ")}
-              </option>
-            ))}
-          </select>
+          <div className="relative mb-3">
+            <button
+              type="button"
+              onClick={() => setPatientPickerOpen((open) => !open)}
+              className="flex w-full items-center justify-between rounded border border-gray-300 bg-white p-2 text-left"
+            >
+              <span className={selectedPatientDetails ? "text-gray-900" : "text-gray-500"}>
+                {selectedPatientDetails
+                  ? [
+                      selectedPatientDetails.name,
+                      selectedPatientDetails.cardNumber || "no card",
+                      selectedPatientDetails.phone || "no phone",
+                    ].join(" | ")
+                  : "Select existing patient"}
+              </span>
+              <span className="text-sm text-gray-500">
+                {patientPickerOpen ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {patientPickerOpen && (
+              <div className="absolute z-20 mt-2 w-full rounded border border-gray-300 bg-white shadow-lg">
+                <div className="border-b border-gray-200 p-2">
+                  <input
+                    autoFocus
+                    value={patientSearchQuery}
+                    onChange={(e) => setPatientSearchQuery(e.target.value)}
+                    className="w-full rounded border border-gray-300 p-2"
+                    placeholder="Search by patient name, card number, or phone"
+                  />
+                </div>
+
+                <div className="max-h-64 overflow-y-auto p-2">
+                  {filteredPatients.length === 0 ? (
+                    <p className="p-2 text-sm text-gray-500">
+                      No patients matched that search.
+                    </p>
+                  ) : (
+                    filteredPatients.map((patient) => (
+                      <button
+                        key={getEntityId(patient)}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPatient(getEntityId(patient));
+                          setPatientPickerOpen(false);
+                        }}
+                        className={`mb-1 w-full rounded px-3 py-2 text-left hover:bg-blue-50 ${
+                          selectedPatient === getEntityId(patient)
+                            ? "bg-blue-100"
+                            : "bg-white"
+                        }`}
+                      >
+                        <p className="font-medium text-gray-900">{patient.name}</p>
+                        <p className="text-sm text-gray-600">
+                          {[patient.cardNumber || "no card", patient.phone || "no phone"].join(" | ")}
+                        </p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -354,21 +438,25 @@ export default function WaitingRoomBoard({
                   )}
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      onClick={() =>
-                        handleOpenRecord(getEntityId(entry.patientId) || entry.patientId)
-                      }
-                      className="bg-slate-700 text-white px-3 py-2 rounded hover:bg-slate-800"
-                    >
-                      Open Record
-                    </button>
+                    {!isFrontDesk && (
+                      <button
+                        onClick={() =>
+                          handleOpenRecord(getEntityId(entry.patientId) || entry.patientId)
+                        }
+                        className="bg-slate-700 text-white px-3 py-2 rounded hover:bg-slate-800"
+                      >
+                        Open Record
+                      </button>
+                    )}
                     {NEXT_ACTION[entry.status] && (
+                      (!isFrontDesk || NEXT_ACTION[entry.status] === "called") && (
                       <button
                         onClick={() => handleStatusUpdate(entry)}
                         className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
                       >
                         {ACTION_LABEL[entry.status]}
                       </button>
+                      )
                     )}
                     <button
                       onClick={() => handleRemove(entry)}

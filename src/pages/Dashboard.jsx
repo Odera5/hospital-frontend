@@ -51,6 +51,10 @@ export default function Dashboard() {
     role: storedUser.role || "nurse",
     clinicName: storedUser.clinic?.name || "Clinic",
   };
+  const canViewRecords =
+    user.role === "admin" || user.role === "doctor" || user.role === "nurse";
+  const canDeletePatients =
+    user.role === "admin" || user.role === "doctor" || user.role === "nurse";
 
   const [patients, setPatients] = useState([]);
   const [patientsToday, setPatientsToday] = useState([]);
@@ -520,7 +524,7 @@ export default function Dashboard() {
                           <td className="border px-4 py-2">{p.age}</td>
                           <td className="border px-4 py-2">{p.cardNumber || "--"}</td>
                           <td className="border px-4 py-2">
-                            {!showTrash && (
+                            {!showTrash && canViewRecords && (
                               <button
                                 onClick={() => handleViewRecords(patientId)}
                                 className="mr-2 rounded bg-blue-600 px-2 py-1 text-white"
@@ -543,13 +547,15 @@ export default function Dashboard() {
                                   Delete Permanently
                                 </button>
                               </div>
-                            ) : (
+                            ) : canDeletePatients ? (
                               <button
                                 onClick={() => handleDelete(patientId)}
                                 className="rounded bg-red-600 px-2 py-1 text-white"
                               >
                                 Delete
                               </button>
+                            ) : (
+                              <span className="text-sm text-gray-500">Front desk access</span>
                             )}
                           </td>
                         </tr>

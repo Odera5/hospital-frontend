@@ -1,6 +1,6 @@
 // src/pages/PatientRecord.jsx
 import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 import Toast from "../components/Toast";
 import Modal from "../components/PatientRecord/Modal";
@@ -15,9 +15,13 @@ const RECORDS_PER_PAGE = 10;
 export default function PatientRecord() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const storedUser = JSON.parse(localStorage.getItem("user")) || {};
   const canEditPatient =
     storedUser.role === "admin" || storedUser.role === "doctor";
+  const canManageRecords =
+    storedUser.role === "admin" || storedUser.role === "doctor";
+  const returnTo = location.state?.returnTo || null;
 
   const [patient, setPatient] = useState(null);
   const [records, setRecords] = useState([]);
@@ -236,7 +240,6 @@ export default function PatientRecord() {
 
       const payload = {
         name: patientForm.name.trim(),
-        cardNumber: patientForm.cardNumber.trim(),
         age: patientForm.age.toString(),
         gender: patientForm.gender || "other",
         phone: patientForm.phone.trim(),
@@ -300,12 +303,23 @@ export default function PatientRecord() {
         />
       )}
 
-      <button
-        onClick={() => navigate("/dashboard")}
-        className="mb-4 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-      >
-        Back to Dashboard
-      </button>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+        >
+          Back to Dashboard
+        </button>
+
+        {returnTo === "/waiting-room" && (
+          <button
+            onClick={() => navigate("/waiting-room")}
+            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+          >
+            Back to Waiting Room
+          </button>
+        )}
+      </div>
 
       <h1 className="text-2xl font-bold mb-2">
         {patient.name}'s Records
@@ -327,12 +341,14 @@ export default function PatientRecord() {
           </button>
         )}
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Add New Record
-        </button>
+        {canManageRecords && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Add New Record
+          </button>
+        )}
       </div>
 
       <SearchFilterSort
@@ -359,6 +375,7 @@ export default function PatientRecord() {
                 handleDelete={handleDeleteRecord}
                 handleSaveEdit={handleSaveEdit}
                 searchKeyword={searchKeyword}
+                canManageRecords={canManageRecords}
               />
             ))
           )}
@@ -445,10 +462,13 @@ export default function PatientRecord() {
                 type="text"
                 name="cardNumber"
                 value={patientForm.cardNumber}
-                onChange={handlePatientFormChange}
                 className="w-full rounded border px-3 py-2"
-                disabled={patientSaveLoading}
+                disabled
+                readOnly
               />
+              <p className="mt-1 text-sm text-gray-500">
+                Assigned automatically at registration and cannot be changed.
+              </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
