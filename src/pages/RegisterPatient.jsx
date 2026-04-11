@@ -7,7 +7,6 @@ import Toast from "../components/Toast";
 export default function RegisterPatient() {
   const [form, setForm] = useState({
     name: "",
-    cardNumber: "",
     age: "",
     email: "",
     gender: "other",
@@ -36,7 +35,6 @@ export default function RegisterPatient() {
       // Ensure all fields are strings for backend encryption
       const payload = {
         name: form.name.trim(),
-        cardNumber: form.cardNumber?.trim() || "",
         age: form.age.toString(),
         gender: form.gender || "other",
         phone: form.phone?.trim() || "",
@@ -52,7 +50,6 @@ export default function RegisterPatient() {
       // Reset form
       setForm({
         name: "",
-        cardNumber: "",
         age: "",
         email: "",
         gender: "other",
@@ -77,6 +74,9 @@ export default function RegisterPatient() {
 
       <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
         <h1 className="text-2xl font-bold mb-6 text-center">Register Patient</h1>
+        <p className="mb-6 rounded bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          Patient card numbers are assigned automatically when you save the registration.
+        </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
@@ -89,19 +89,6 @@ export default function RegisterPatient() {
               onChange={handleChange}
               className="w-full border rounded px-3 py-2"
               disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label className="block mb-1 font-medium">Patient Card Number</label>
-            <input
-              type="text"
-              name="cardNumber"
-              value={form.cardNumber}
-              onChange={handleChange}
-              className="w-full border rounded px-3 py-2"
-              disabled={loading}
-              placeholder="e.g. BHF-000123"
             />
           </div>
 

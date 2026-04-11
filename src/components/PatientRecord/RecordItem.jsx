@@ -135,6 +135,39 @@ function RecordItem({
             <HighlightText text={record.medication || ""} keyword={searchKeyword} />
           </p>
 
+          <div className="space-y-1">
+            <strong>Consent:</strong>
+            <p>
+              {record.consentObtained ? "Obtained" : "Not documented as obtained"}
+            </p>
+            {record.consentObtained && (
+              <>
+                <p>
+                  <span className="font-medium">Date:</span>{" "}
+                  {record.consentDate
+                    ? new Date(record.consentDate).toLocaleString()
+                    : "Not recorded"}
+                </p>
+                <p>
+                  <span className="font-medium">Taken By:</span>{" "}
+                  <HighlightText
+                    text={record.consentTakenBy || "Not recorded"}
+                    keyword={searchKeyword}
+                  />
+                </p>
+                {record.consentNotes && (
+                  <p>
+                    <span className="font-medium">Notes:</span>{" "}
+                    <HighlightText
+                      text={record.consentNotes || ""}
+                      keyword={searchKeyword}
+                    />
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
           <p>
             <strong>Created At:</strong>{" "}
             {record.createdAt ? new Date(record.createdAt).toLocaleString() : "-"}

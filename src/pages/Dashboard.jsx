@@ -15,6 +15,31 @@ const formatLocalDateKey = (value = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+const defaultWaitingSummary = {
+  waiting: 0,
+  called: 0,
+  in_consultation: 0,
+  completed: 0,
+  total: 0,
+};
+
+const shouldSuppressDashboardError = (error) => {
+  const status = error?.response?.status;
+  const message = String(error?.response?.data?.message || error?.message || "")
+    .toLowerCase()
+    .trim();
+
+  if ([400, 404].includes(status)) return true;
+
+  return (
+    message.includes("not found") ||
+    message.includes("no appointment") ||
+    message.includes("no invoice") ||
+    message.includes("no record") ||
+    message.includes("no data")
+  );
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,13 +55,7 @@ export default function Dashboard() {
   const [patients, setPatients] = useState([]);
   const [patientsToday, setPatientsToday] = useState([]);
   const [appointmentsToday, setAppointmentsToday] = useState(0);
-  const [waitingSummary, setWaitingSummary] = useState({
-    waiting: 0,
-    called: 0,
-    in_consultation: 0,
-    completed: 0,
-    total: 0,
-  });
+  const [waitingSummary, setWaitingSummary] = useState(defaultWaitingSummary);
   const [monthlyRevenue, setMonthlyRevenue] = useState(0);
   const [trash, setTrash] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -91,7 +110,10 @@ export default function Dashboard() {
       );
     } catch (err) {
       console.error(err);
-      showToast("Failed to load trash", "error");
+      setTrash([]);
+      if (!shouldSuppressDashboardError(err)) {
+        showToast("Failed to load trash", "error");
+      }
     }
   };
 
@@ -104,25 +126,23 @@ export default function Dashboard() {
       setAppointmentsToday(res.data?.length || 0);
     } catch (err) {
       console.error(err);
-      showToast("Failed to load today's appointments", "error");
+      setAppointmentsToday(0);
+      if (!shouldSuppressDashboardError(err)) {
+        showToast("Failed to load today's appointments", "error");
+      }
     }
   };
 
   const fetchWaitingSummary = async () => {
     try {
       const res = await api.get("/waiting-room/summary");
-      setWaitingSummary(
-        res.data || {
-          waiting: 0,
-          called: 0,
-          in_consultation: 0,
-          completed: 0,
-          total: 0,
-        },
-      );
+      setWaitingSummary(res.data || defaultWaitingSummary);
     } catch (err) {
       console.error(err);
-      showToast("Failed to load waiting room summary", "error");
+      setWaitingSummary(defaultWaitingSummary);
+      if (!shouldSuppressDashboardError(err)) {
+        showToast("Failed to load waiting room summary", "error");
+      }
     }
   };
 
@@ -141,7 +161,10 @@ export default function Dashboard() {
       setMonthlyRevenue(res.data?.totalRevenue || 0);
     } catch (err) {
       console.error(err);
-      showToast("Failed to load revenue summary", "error");
+      setMonthlyRevenue(0);
+      if (!shouldSuppressDashboardError(err)) {
+        showToast("Failed to load revenue summary", "error");
+      }
     }
   };
 
@@ -321,12 +344,14 @@ export default function Dashboard() {
         />
       )}
 
-      <div className="flex-1">
+      <main className="flex-1" aria-labelledby="dashboard-heading">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-xl font-bold sm:text-2xl">Welcome, {user.name}</h1>
-            <p className="flex flex-wrap items-center gap-2 text-sm text-gray-600 sm:gap-4">
-              Role: {user.role} <span className="text-gray-400">|</span>{" "}
+            <h1 id="dashboard-heading" className="text-xl font-bold sm:text-2xl">
+              Welcome, {user.name}
+            </h1>
+            <p className="flex flex-wrap items-center gap-2 text-sm text-gray-700 sm:gap-4">
+              Role: {user.role} <span className="text-gray-500">|</span>{" "}
               {formattedDate} {formattedTime}
             </p>
           </div>
@@ -388,45 +413,74 @@ export default function Dashboard() {
         </div>
 
         {!showTrash && (
-          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded bg-white p-4 text-center shadow">
-              <h3 className="text-gray-500 text-sm">Patients Registered Today</h3>
-              <p className="text-2xl font-bold">{patientsToday.length}</p>
+          <section aria-labelledby="dashboard-overview-heading" className="mb-6">
+            <h2
+              id="dashboard-overview-heading"
+              className="mb-3 text-lg font-semibold text-gray-900"
+            >
+              Dashboard Overview
+            </h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded bg-white p-4 text-center shadow">
+                <h3 className="text-sm font-medium text-gray-700">
+                  Patients Registered Today
+                </h3>
+                <p className="text-2xl font-bold">{patientsToday.length}</p>
+              </div>
+              <div className="rounded bg-white p-4 text-center shadow">
+                <h3 className="text-sm font-medium text-gray-700">
+                  Appointments Today
+                </h3>
+                <p className="text-2xl font-bold">{appointmentsToday}</p>
+              </div>
+              <div className="rounded bg-white p-4 text-center shadow">
+                <h3 className="text-sm font-medium text-gray-700">
+                  Waiting Patients
+                </h3>
+                <p className="text-2xl font-bold">{waitingSummary.waiting}</p>
+              </div>
+              <div className="rounded bg-white p-4 text-center shadow">
+                <h3 className="text-sm font-medium text-gray-700">
+                  Monthly Revenue
+                </h3>
+                <p className="text-2xl font-bold">
+                  NGN {monthlyRevenue.toLocaleString()}
+                </p>
+              </div>
             </div>
-            <div className="rounded bg-white p-4 text-center shadow">
-              <h3 className="text-gray-500 text-sm">Appointments Today</h3>
-              <p className="text-2xl font-bold">{appointmentsToday}</p>
-            </div>
-            <div className="rounded bg-white p-4 text-center shadow">
-              <h3 className="text-gray-500 text-sm">Waiting Patients</h3>
-              <p className="text-2xl font-bold">{waitingSummary.waiting}</p>
-            </div>
-            <div className="rounded bg-white p-4 text-center shadow">
-              <h3 className="text-gray-500 text-sm">Monthly Revenue</h3>
-              <p className="text-2xl font-bold">
-                NGN {monthlyRevenue.toLocaleString()}
-              </p>
-            </div>
-          </div>
+          </section>
         )}
 
-        <input
-          type="text"
-          placeholder="Search patients by name or card number..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="mb-4 w-full rounded border px-3 py-2"
-        />
-
-        <div className="rounded bg-white p-4 shadow sm:p-6">
-          <h2 className="text-xl font-semibold mb-4">
-            {showTrash ? "Trash" : "Patients"}
-          </h2>
+        <section
+          aria-labelledby="patient-list-heading"
+          className="rounded bg-white p-4 shadow sm:p-6"
+        >
+          <div className="mb-4 flex flex-col gap-3">
+            <h2 id="patient-list-heading" className="text-xl font-semibold text-gray-900">
+              {showTrash ? "Trash" : "Patients"}
+            </h2>
+            <div>
+              <label
+                htmlFor="patient-search"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                Search patients
+              </label>
+              <input
+                id="patient-search"
+                type="text"
+                placeholder="Search patients by name or card number..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded border border-gray-300 px-3 py-2"
+              />
+            </div>
+          </div>
 
           {loading ? (
-            <p className="text-center text-gray-500">Loading patients...</p>
+            <p className="text-center text-gray-600">Loading patients...</p>
           ) : activeList.length === 0 ? (
-            <p className="text-gray-500">
+            <p className="text-gray-600">
               {showTrash ? "No trashed patients." : "No patients found."}
             </p>
           ) : (
@@ -505,7 +559,7 @@ export default function Dashboard() {
                 </table>
               </div>
 
-              <div className="flex flex-col gap-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 text-sm text-gray-700 sm:flex-row sm:items-center sm:justify-between">
                 <p>
                   Showing {pageStartIndex + 1}-{Math.min(pageStartIndex + PATIENTS_PER_PAGE, activeList.length)} of{" "}
                   {activeList.length} {showTrash ? "trashed patients" : "patients"}
@@ -535,10 +589,10 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-        </div>
-      </div>
+        </section>
+      </main>
 
-      <p className="pt-6 text-center text-xs font-semibold uppercase tracking-[0.25em] text-gray-500">
+      <p className="pt-6 text-center text-xs font-semibold uppercase tracking-[0.25em] text-gray-600">
         BHF by PrimuxCare
       </p>
     </div>

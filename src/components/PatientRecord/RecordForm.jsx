@@ -126,6 +126,21 @@ function FormField({
   );
 }
 
+function CheckboxField({ label, name, checked, onChange }) {
+  return (
+    <label className="flex items-center gap-3 rounded border border-gray-200 bg-gray-50 p-3">
+      <input
+        type="checkbox"
+        name={name}
+        checked={checked}
+        onChange={onChange}
+        className="h-4 w-4"
+      />
+      <span className="font-medium text-gray-800">{label}</span>
+    </label>
+  );
+}
+
 function ToothChart({ teeth, onToothClick, dentition }) {
   const quadrants = {
     UR: teeth
@@ -281,6 +296,19 @@ export default function RecordForm({
 
   const handleChange = (e) =>
     setRecordData({ ...recordData, [e.target.name]: e.target.value });
+
+  const handleCheckboxChange = (e) =>
+    setRecordData({
+      ...recordData,
+      [e.target.name]: e.target.checked,
+      ...(e.target.name === "consentObtained" && !e.target.checked
+        ? {
+            consentDate: "",
+            consentTakenBy: "",
+            consentNotes: "",
+          }
+        : {}),
+    });
 
   const handleReset = () => {
     const emptyRecord = createEmptyRecord();
@@ -494,6 +522,54 @@ export default function RecordForm({
             type="textarea"
             rows={2}
           />
+        </div>
+      </div>
+
+      <div className="p-4 border rounded shadow-sm bg-white">
+        <div className="mb-4">
+          <h2 className="font-bold text-lg">Consent</h2>
+          <p className="text-sm text-gray-600">
+            Record whether consent was discussed and obtained before treatment.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <CheckboxField
+            label="Consent obtained before treatment"
+            name="consentObtained"
+            checked={Boolean(recordData.consentObtained)}
+            onChange={handleCheckboxChange}
+          />
+
+          {recordData.consentObtained && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField
+                label="Consent Date"
+                name="consentDate"
+                type="datetime-local"
+                value={recordData.consentDate || ""}
+                onChange={handleChange}
+              />
+              <FormField
+                label="Consent Taken By"
+                name="consentTakenBy"
+                value={recordData.consentTakenBy || ""}
+                onChange={handleChange}
+                placeholder="e.g. Dr. Ade, Nurse Grace"
+              />
+              <div className="md:col-span-2">
+                <FormField
+                  label="Consent Notes"
+                  name="consentNotes"
+                  value={recordData.consentNotes || ""}
+                  onChange={handleChange}
+                  type="textarea"
+                  rows={3}
+                  placeholder="Procedure explained, risks discussed, paper form signed..."
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
