@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
 const Button = React.forwardRef(
@@ -21,16 +20,15 @@ const Button = React.forwardRef(
     };
 
     return (
-      <motion.button
+      <button
         ref={ref}
-        whileTap={{ scale: 0.98 }}
         className={`${baseStyles} ${variants[variant]} ${sizes[size]} w-full ${className}`}
         disabled={isLoading || props.disabled}
         {...props}
       >
         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {children}
-      </motion.button>
+      </button>
     );
   }
 );

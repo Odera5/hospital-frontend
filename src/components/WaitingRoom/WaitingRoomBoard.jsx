@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { Users, Activity, CheckCircle, ChevronDown, ChevronUp, Bell, Clock, Search, LogOut, FileText, ArrowRight, UserPlus } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { Users, Activity, CheckCircle, ChevronDown, ChevronUp, Bell, Search, LogOut, FileText, ArrowRight, UserPlus } from "lucide-react";
 import api from "../../services/api";
 import Toast from "../Toast";
 import { getEntityId } from "../../utils/entityId";
@@ -45,7 +45,12 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
   useEffect(() => { if (preselectPatientId) setSelectedPatient(preselectPatientId); }, [preselectPatientId]);
 
   const fetchPatients = useCallback(async () => {
-    try { const response = await api.get("/patients"); setPatients(response.data || []); } catch (error) { console.error(error); }
+    try {
+      const response = await api.get("/patients");
+      setPatients(response.data || []);
+    } catch (error) {
+      console.error(error);
+    }
   }, []);
 
   const fetchQueue = useCallback(async () => {
@@ -56,10 +61,19 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
       if (searchQuery) params.append("search", searchQuery);
       const response = await api.get(`/waiting-room?${params}`);
       setEntries(response.data || []);
-    } catch (error) { console.error(error); } finally { setLoading(false); }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   }, [searchQuery, statusFilter]);
 
-  useEffect(() => { fetchPatients(); fetchQueue(); const interval = setInterval(fetchQueue, 8000); return () => clearInterval(interval); }, [fetchPatients, fetchQueue]);
+  useEffect(() => {
+    fetchPatients();
+    fetchQueue();
+    const interval = setInterval(fetchQueue, 8000);
+    return () => clearInterval(interval);
+  }, [fetchPatients, fetchQueue]);
 
   const showToast = (message, type = "success") => setToast({ show: true, message, type });
 
@@ -67,10 +81,15 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
     if (!selectedPatient) return showToast("Select a patient to add", "error");
     try {
       await api.post("/waiting-room", { patientId: selectedPatient, notes });
-      setSelectedPatient(""); setPatientSearchQuery(""); setPatientPickerOpen(false); setNotes("");
+      setSelectedPatient("");
+      setPatientSearchQuery("");
+      setPatientPickerOpen(false);
+      setNotes("");
       showToast("Patient added to waiting room", "success");
       fetchQueue();
-    } catch (error) { showToast(error.response?.data?.message || "Failed to add patient", "error"); }
+    } catch (error) {
+      showToast(error.response?.data?.message || "Failed to add patient", "error");
+    }
   };
 
   const handleOpenRecord = (patientId) => {
@@ -87,7 +106,9 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
       await api.put(`/waiting-room/${getEntityId(item)}`, { status: nextStatus });
       showToast(`${item.patientName || item.patientId?.name} moved to ${STATUS_LABELS[nextStatus]}`, "success");
       fetchQueue();
-    } catch (error) { showToast(error.response?.data?.message || "Failed to update status", "error"); }
+    } catch (error) {
+      showToast(error.response?.data?.message || "Failed to update status", "error");
+    }
   };
 
   const handleRemove = async (item) => {
@@ -96,7 +117,9 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
       await api.delete(`/waiting-room/${getEntityId(item)}`);
       showToast("Patient removed from waiting list", "success");
       fetchQueue();
-    } catch (error) { showToast(error.response?.data?.message || "Failed to remove patient", "error"); }
+    } catch (error) {
+      showToast(error.response?.data?.message || "Failed to remove patient", "error");
+    }
   };
 
   const sectionItems = (status) => entries.filter((entry) => entry.status === status);
@@ -130,11 +153,11 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
       </div>
 
       {newPatient && (
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-2xl border border-primary-200 bg-primary-50 p-6 flex flex-col md:flex-row gap-4 justify-between items-center shadow-sm">
+        <div className="rounded-2xl border border-primary-200 bg-primary-50 p-6 flex flex-col md:flex-row gap-4 justify-between items-center shadow-sm">
           <div>
-             <p className="text-xs font-bold uppercase tracking-widest text-primary-600 mb-1 flex items-center"><UserPlus size={14} className="mr-1" /> Newly Registered</p>
-             <h3 className="text-xl font-bold text-slate-900">{newPatient.name}</h3>
-             <p className="text-sm text-slate-600 mt-1">Card: <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200">{newPatient.cardNumber || "Pending"}</span></p>
+            <p className="text-xs font-bold uppercase tracking-widest text-primary-600 mb-1 flex items-center"><UserPlus size={14} className="mr-1" /> Newly Registered</p>
+            <h3 className="text-xl font-bold text-slate-900">{newPatient.name}</h3>
+            <p className="text-sm text-slate-600 mt-1">Card: <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200">{newPatient.cardNumber || "Pending"}</span></p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
             <Button onClick={() => { if (preselectPatientId) setSelectedPatient(preselectPatientId); }} className="w-full sm:w-auto shadow-md">
@@ -146,34 +169,32 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
               </Button>
             )}
           </div>
-        </motion.div>
+        </div>
       )}
 
-      {/* Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {Object.entries(STATUS_LABELS).map(([key, label]) => (
-           <Card key={key} className="border-0 shadow-sm relative overflow-hidden bg-white">
-             <div className={`absolute top-0 left-0 w-1.5 h-full ${METRIC_COLORS[key].split(' ')[0]}`} />
-             <CardContent className="p-5 pl-6 flex flex-col items-start">
-               <p className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-2">{label}</p>
-               <div className="flex items-end gap-3 tracking-tight">
-                 <span className="text-4xl font-bold text-slate-900 leading-none">{sectionItems(key).length}</span>
-                 <span className="text-sm font-medium text-slate-400 mb-1 shrink-0">Patients</span>
-               </div>
-             </CardContent>
-           </Card>
+          <Card key={key} className="border-0 shadow-sm relative overflow-hidden bg-white">
+            <div className={`absolute top-0 left-0 w-1.5 h-full ${METRIC_COLORS[key].split(" ")[0]}`} />
+            <CardContent className="p-5 pl-6 flex flex-col items-start">
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-2">{label}</p>
+              <div className="flex items-end gap-3 tracking-tight">
+                <span className="text-4xl font-bold text-slate-900 leading-none">{sectionItems(key).length}</span>
+                <span className="text-sm font-medium text-slate-400 mb-1 shrink-0">Patients</span>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Check-in panel */}
         <Card className="h-fit">
           <CardContent className="p-6">
             <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center"><UserPlus size={20} className="mr-2 text-primary-500" /> Walk-in / Check-in</h3>
             <div className="space-y-4">
               <div className="relative">
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Select Patient</label>
-                <div 
+                <div
                   onClick={() => setPatientPickerOpen(!patientPickerOpen)}
                   className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 cursor-pointer hover:border-slate-300 transition-colors"
                 >
@@ -185,7 +206,7 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
 
                 <AnimatePresence>
                   {patientPickerOpen && (
-                    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute z-30 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden">
+                    <div className="absolute z-30 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden">
                       <div className="border-b border-slate-100 p-2">
                         <Input autoFocus value={patientSearchQuery} onChange={(e) => setPatientSearchQuery(e.target.value)} placeholder="Search name or card..." icon={Search} className="h-10 text-sm" />
                       </div>
@@ -205,7 +226,7 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
                           ))
                         )}
                       </div>
-                    </motion.div>
+                    </div>
                   )}
                 </AnimatePresence>
               </div>
@@ -226,72 +247,73 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
           </CardContent>
         </Card>
 
-        {/* Live Queue tracking list */}
         <div className="lg:col-span-2 space-y-6">
           <div className="flex flex-col sm:flex-row items-center gap-3">
-             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full sm:w-auto rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 focus:outline-none shadow-sm">
-                <option value="all">All Statuses</option>
-                {Object.entries(STATUS_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
-             </select>
-             <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search queue..." icon={Search} className="bg-white rounded-full shadow-sm" />
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full sm:w-auto rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 focus:outline-none shadow-sm">
+              <option value="all">All Statuses</option>
+              {Object.entries(STATUS_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
+            </select>
+            <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search queue..." icon={Search} className="bg-white rounded-full shadow-sm" />
           </div>
 
           {loading ? (
-             <div className="py-20 text-center"><div className="h-8 w-8 mx-auto animate-spin rounded-full border-4 border-primary-600 border-t-transparent mb-4" /><p className="text-slate-500 font-medium">Loading queue data...</p></div>
+            <div className="py-20 text-center"><div className="h-8 w-8 mx-auto animate-spin rounded-full border-4 border-primary-600 border-t-transparent mb-4" /><p className="text-slate-500 font-medium">Loading queue data...</p></div>
           ) : entries.length === 0 ? (
-             <Card className="border-dashed border-2 bg-slate-50/50"><CardContent className="py-20 flex flex-col items-center justify-center text-slate-500"><Users size={48} className="text-slate-300 mb-4" /><p className="text-lg font-semibold text-slate-700">Empty Queue</p><p className="text-sm">There are no patients waiting matching your criteria.</p></CardContent></Card>
+            <Card className="border-dashed border-2 bg-slate-50/50"><CardContent className="py-20 flex flex-col items-center justify-center text-slate-500"><Users size={48} className="text-slate-300 mb-4" /><p className="text-lg font-semibold text-slate-700">Empty Queue</p><p className="text-sm">There are no patients waiting matching your criteria.</p></CardContent></Card>
           ) : (
             <div className="space-y-3">
               <AnimatePresence>
                 {entries.map((entry) => (
-                  <motion.div key={getEntityId(entry)} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.95, height: 0 }}>
+                  <div key={getEntityId(entry)}>
                     <Card className="border border-surface-200 hover:shadow-md transition-all group overflow-hidden relative">
-                      <div className={`absolute top-0 left-0 w-1.5 h-full ${STATUS_STYLES[entry.status].split(' ')[0]}`} />
+                      <div className={`absolute top-0 left-0 w-1.5 h-full ${STATUS_STYLES[entry.status].split(" ")[0]}`} />
                       <CardContent className="p-4 pl-6 md:p-5 md:pl-7">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div className="flex-1">
-                             <div className="flex items-center gap-3 mb-1">
-                               <h4 className="font-bold text-slate-900 text-lg">{entry.patientName || entry.patientId?.name}</h4>
-                               <span className={`px-2 py-0.5 rounded textxs font-semibold uppercase tracking-wider border ${STATUS_STYLES[entry.status]}`}>{STATUS_LABELS[entry.status]}</span>
-                             </div>
-                             {(entry.patientId?.phone || entry.patientId?.cardNumber) && (
-                               <p className="text-sm text-slate-500 mt-1 font-mono">{[entry.patientId?.cardNumber, entry.patientId?.phone].filter(Boolean).join(" • ")}</p>
-                             )}
-                             
-                             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3.5 pt-3.5 border-t border-slate-100 text-xs font-medium text-slate-500">
-                                <span className="flex items-center"><LogOut size={12} className="mr-1 shrink-0" /> Arrived: {formatDate(entry.arrivalTime)}</span>
-                                {entry.calledAt && <span className="flex items-center"><Bell size={12} className="mr-1 shrink-0 text-amber-500" /> Called: {formatDate(entry.calledAt)}</span>}
-                                {entry.consultationStartedAt && <span className="flex items-center"><CheckCircle size={12} className="mr-1 shrink-0 text-emerald-500" /> Consult: {formatDate(entry.consultationStartedAt)}</span>}
-                             </div>
+                            <div className="flex items-center gap-3 mb-1">
+                              <h4 className="font-bold text-slate-900 text-lg">{entry.patientName || entry.patientId?.name}</h4>
+                              <span className={`px-2 py-0.5 rounded textxs font-semibold uppercase tracking-wider border ${STATUS_STYLES[entry.status]}`}>{STATUS_LABELS[entry.status]}</span>
+                            </div>
+                            {(entry.patientId?.phone || entry.patientId?.cardNumber) && (
+                              <p className="text-sm text-slate-500 mt-1 font-mono">
+                                {[entry.patientId?.cardNumber, entry.patientId?.phone].filter(Boolean).join(" | ")}
+                              </p>
+                            )}
 
-                             {entry.notes && (
-                                <div className="mt-3 bg-slate-50 italic text-slate-600 text-sm p-3 rounded-lg border border-slate-100 flex items-start">
-                                  <FileText size={16} className="text-slate-400 mr-2 shrink-0 mt-0.5" /> {entry.notes}
-                                </div>
-                             )}
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3.5 pt-3.5 border-t border-slate-100 text-xs font-medium text-slate-500">
+                              <span className="flex items-center"><LogOut size={12} className="mr-1 shrink-0" /> Arrived: {formatDate(entry.arrivalTime)}</span>
+                              {entry.calledAt && <span className="flex items-center"><Bell size={12} className="mr-1 shrink-0 text-amber-500" /> Called: {formatDate(entry.calledAt)}</span>}
+                              {entry.consultationStartedAt && <span className="flex items-center"><CheckCircle size={12} className="mr-1 shrink-0 text-emerald-500" /> Consult: {formatDate(entry.consultationStartedAt)}</span>}
+                            </div>
+
+                            {entry.notes && (
+                              <div className="mt-3 bg-slate-50 italic text-slate-600 text-sm p-3 rounded-lg border border-slate-100 flex items-start">
+                                <FileText size={16} className="text-slate-400 mr-2 shrink-0 mt-0.5" /> {entry.notes}
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex flex-col sm:flex-row md:flex-col gap-2 min-w-[140px] shrink-0 border-t pt-3 md:border-t-0 md:pt-0 border-slate-100">
-                             {NEXT_ACTION[entry.status] && (!isFrontDesk || NEXT_ACTION[entry.status] === "called") && (
-                               <Button onClick={() => handleStatusUpdate(entry)} size="sm" className="w-full bg-slate-800 hover:bg-slate-900 shadow text-white">
-                                 {ACTION_LABEL[entry.status]} <ArrowRight size={14} className="ml-1.5" />
-                               </Button>
-                             )}
-                             {!isFrontDesk && (
-                               <Button variant="outline" size="sm" onClick={() => handleOpenRecord(getEntityId(entry.patientId) || entry.patientId)} className="w-full bg-white">
-                                 Open Chart
-                               </Button>
-                             )}
-                             {(isFrontDesk || entry.status === "completed") && (
-                               <Button variant="ghost" size="sm" onClick={() => handleRemove(entry)} className="w-full text-red-500 hover:bg-red-50 hover:text-red-700">
-                                 Remove
-                               </Button>
-                             )}
+                            {NEXT_ACTION[entry.status] && (!isFrontDesk || NEXT_ACTION[entry.status] === "called") && (
+                              <Button onClick={() => handleStatusUpdate(entry)} size="sm" className="w-full bg-slate-800 hover:bg-slate-900 shadow text-white">
+                                {ACTION_LABEL[entry.status]} <ArrowRight size={14} className="ml-1.5" />
+                              </Button>
+                            )}
+                            {!isFrontDesk && (
+                              <Button variant="outline" size="sm" onClick={() => handleOpenRecord(getEntityId(entry.patientId) || entry.patientId)} className="w-full bg-white">
+                                Open Chart
+                              </Button>
+                            )}
+                            {(isFrontDesk || entry.status === "completed") && (
+                              <Button variant="ghost" size="sm" onClick={() => handleRemove(entry)} className="w-full text-red-500 hover:bg-red-50 hover:text-red-700">
+                                Remove
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardContent>
                     </Card>
-                  </motion.div>
+                  </div>
                 ))}
               </AnimatePresence>
             </div>

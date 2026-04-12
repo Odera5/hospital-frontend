@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect, useCallback } from "react";
 import { User, Calendar, Clock, MapPin, Phone, Mail, Hash, UserPlus, Save, X, Activity } from "lucide-react";
 import api from "../../services/api";
 import Toast from "../Toast";
@@ -22,7 +21,30 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
   const [slotLoading, setSlotLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
 
-  useEffect(() => { fetchPatients(); }, []);
+  const fetchPatients = useCallback(async () => {
+    try {
+      const response = await api.get("/patients");
+      setPatients(response.data);
+    } catch (error) {
+      console.error("Failed to fetch patients:", error);
+    }
+  }, []);
+
+  const fetchAvailableSlots = useCallback(async () => {
+    try {
+      setSlotLoading(true);
+      const response = await api.get(`/appointments/available-slots?date=${formData.appointmentDate}&duration=${formData.duration}${appointment ? `&appointmentId=${getEntityId(appointment)}` : ""}`);
+      setAvailableSlots(response.data.availableSlots);
+      setFormData((prev) => ({ ...prev, timeSlot: response.data.availableSlots.includes(prev.timeSlot) ? prev.timeSlot : "" }));
+    } catch (error) {
+      console.error("Failed to fetch slots:", error);
+      setAvailableSlots([]);
+    } finally {
+      setSlotLoading(false);
+    }
+  }, [appointment, formData.appointmentDate, formData.duration]);
+
+  useEffect(() => { fetchPatients(); }, [fetchPatients]);
 
   useEffect(() => {
     if (appointment) {
@@ -37,20 +59,7 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
 
   useEffect(() => {
     if (formData.appointmentDate) fetchAvailableSlots();
-  }, [formData.appointmentDate, formData.duration]);
-
-  const fetchPatients = async () => {
-    try { const response = await api.get("/patients"); setPatients(response.data); } catch (error) { console.error("Failed to fetch patients:", error); }
-  };
-
-  const fetchAvailableSlots = async () => {
-    try {
-      setSlotLoading(true);
-      const response = await api.get(`/appointments/available-slots?date=${formData.appointmentDate}&duration=${formData.duration}${appointment ? `&appointmentId=${getEntityId(appointment)}` : ""}`);
-      setAvailableSlots(response.data.availableSlots);
-      setFormData((prev) => ({ ...prev, timeSlot: response.data.availableSlots.includes(prev.timeSlot) ? prev.timeSlot : "" }));
-    } catch (error) { console.error("Failed to fetch slots:", error); setAvailableSlots([]); } finally { setSlotLoading(false); }
-  };
+  }, [fetchAvailableSlots, formData.appointmentDate]);
 
   const handleChange = (e) => setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   const handleNewPatientChange = (e) => setNewPatient((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -85,7 +94,7 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl mx-auto pb-8">
+    <div className="max-w-3xl mx-auto pb-8">
       <Card className="border-0 shadow-lg bg-white overflow-hidden">
         <div className="bg-slate-900 px-8 py-8 text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 opacity-10 transform translate-x-1/4 -translate-y-1/4">
@@ -195,6 +204,6 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
         </CardContent>
       </Card>
       {toast.show && <Toast message={toast.message} type={toast.type} duration={3000} onClose={() => setToast({ ...toast, show: false })} />}
-    </motion.div>
+    </div>
   );
 }

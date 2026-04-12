@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, FileText, Calendar, Activity, PenTool, Trash2, Edit2, Info, CheckCircle2, Clock } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { ChevronDown, ChevronUp, Calendar, Activity, PenTool, Trash2, Edit2, Info, CheckCircle2, Clock } from "lucide-react";
 import RecordForm from "./RecordForm";
 import Modal from "./Modal";
 import HighlightText from "../../utils/HighlightText";
@@ -70,7 +70,7 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
 
       <AnimatePresence initial={false}>
         {isExpanded && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
+          <div className="overflow-hidden">
             <div className="p-6 border-t border-slate-100 bg-white">
               
               <RecordSection title="History of Presenting Complaint" content={record.history} icon={Clock} keyword={searchKeyword} />
@@ -139,7 +139,7 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
                  )}
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

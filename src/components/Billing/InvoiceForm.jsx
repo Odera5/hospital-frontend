@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import { Plus, Trash2, FileText, Calendar, CreditCard, Save, X, User } from "lucide-react";
 import api from "../../services/api";
 import Toast from "../Toast";
@@ -31,7 +30,9 @@ export default function InvoiceForm({ patientId = null, onSuccess, onCancel }) {
     try {
       const response = await api.get("/auth/clinic-profile");
       setProcedurePresets(normalizeProcedurePresets(response.data?.clinic?.procedurePresetPrices));
-    } catch (error) { setProcedurePresets(DEFAULT_PROCEDURE_PRESETS); }
+    } catch {
+      setProcedurePresets(DEFAULT_PROCEDURE_PRESETS);
+    }
   };
 
   const handlePatientChange = (value) => setFormData((prev) => ({ ...prev, patientId: value }));
@@ -68,7 +69,7 @@ export default function InvoiceForm({ patientId = null, onSuccess, onCancel }) {
   const total = subtotal + tax - formData.discount;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto pb-8">
+    <div className="max-w-4xl mx-auto pb-8">
       <Card className="border-0 shadow-lg bg-white overflow-hidden">
         <div className="bg-slate-900 px-8 py-8 text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 opacity-10 transform translate-x-1/4 -translate-y-1/4"><FileText size={150} /></div>
@@ -183,6 +184,6 @@ export default function InvoiceForm({ patientId = null, onSuccess, onCancel }) {
         </CardContent>
       </Card>
       {toast.show && <Toast message={toast.message} type={toast.type} duration={3000} onClose={() => setToast({ ...toast, show: false })} />}
-    </motion.div>
+    </div>
   );
 }

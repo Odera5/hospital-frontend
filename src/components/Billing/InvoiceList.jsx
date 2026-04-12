@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { CreditCard, FileText, Download, DollarSign, Users, AlertCircle, Plus, Search, ChevronDown, CheckCircle, Printer, ArrowLeft, MoreVertical, Activity } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { CreditCard, FileText, DollarSign, AlertCircle, Plus, Search, ChevronDown, CheckCircle, Printer, ArrowLeft, Activity } from "lucide-react";
 import api from "../../services/api";
 import Toast from "../Toast";
 import InvoiceForm from "./InvoiceForm";
@@ -16,8 +16,6 @@ const getStatusColor = (status) => {
   const colors = { draft: "bg-slate-100 text-slate-700", issued: "bg-blue-100 text-blue-700", paid: "bg-emerald-100 text-emerald-700", overdue: "bg-rose-100 text-rose-700", cancelled: "bg-zinc-200 text-zinc-700" };
   return colors[status] || "bg-slate-100 text-slate-700";
 };
-
-const getPatientLabel = (patient) => [patient?.name || "Unknown patient", patient?.phone || "No phone"].join(" | ");
 
 function StatCard({ label, value, tone, icon: Icon }) {
   const tones = {
@@ -39,15 +37,6 @@ function StatCard({ label, value, tone, icon: Icon }) {
         <p className="mt-4 text-3xl font-bold tracking-tight">{value}</p>
       </CardContent>
     </Card>
-  );
-}
-
-function MiniMetric({ label, value }) {
-  return (
-    <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200 hover:border-primary-300 transition-colors">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">{label}</p>
-      <p className="text-2xl font-bold text-slate-900">{value}</p>
-    </div>
   );
 }
 
@@ -78,7 +67,7 @@ function InvoiceViewer({ invoice, onClose }) {
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mx-auto max-w-5xl rounded-2xl bg-white shadow-xl overflow-hidden mb-8 border border-slate-200">
+    <div className="mx-auto max-w-5xl rounded-2xl bg-white shadow-xl overflow-hidden mb-8 border border-slate-200">
       <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
          <button onClick={onClose} className="flex items-center text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"><ArrowLeft size={16} className="mr-2" /> Back to Billing</button>
          <button onClick={() => window.print()} className="flex items-center text-sm font-semibold text-primary-600 hover:text-primary-700 transition-colors"><Printer size={16} className="mr-2" /> Print</button>
@@ -185,7 +174,7 @@ function InvoiceViewer({ invoice, onClose }) {
         </div>
       </div>
       {toast.show && <Toast message={toast.message} type={toast.type} duration={3000} onClose={() => setToast({ ...toast, show: false })} />}
-    </motion.div>
+    </div>
   );
 }
 
@@ -201,7 +190,7 @@ export default function InvoiceList({ patientId = null }) {
   const [selectedPatientId, setSelectedPatientId] = useState(patientId || "");
   const [report, setReport] = useState(null);
 
-  useEffect(() => { fetchInvoices(); fetchReport(); fetchPatients(); }, []);
+  useEffect(() => { fetchInvoices(); fetchReport(); fetchPatients(); }, [patientId]);
 
   const fetchInvoices = async () => {
     try { setLoading(true); const params = new URLSearchParams(); if (patientId) params.append("patientId", patientId); const response = await api.get(`/invoices?${params}`); setInvoices(response.data || []); } catch (error) { setToast({ show: true, message: error.response?.data?.message || "Failed to fetch invoices", type: "error" }); } finally { setLoading(false); }
@@ -212,7 +201,7 @@ export default function InvoiceList({ patientId = null }) {
 
   const handleFormSuccess = () => { setShowForm(false); setViewingInvoice(null); fetchInvoices(); fetchReport(); };
   const handleIssueInvoice = async (id) => {
-    try { await api.put(`/invoices/${id}/issue`); setToast({ show: true, message: "Invoice issued", type: "success" }); fetchInvoices(); fetchReport(); } catch (error) { setToast({ show: true, message: "Failed to issue", type: "error" }); }
+    try { await api.put(`/invoices/${id}/issue`); setToast({ show: true, message: "Invoice issued", type: "success" }); fetchInvoices(); fetchReport(); } catch (error) { setToast({ show: true, message: error.response?.data?.message || "Failed to issue", type: "error" }); }
   };
 
   const patientSummaries = useMemo(() => {

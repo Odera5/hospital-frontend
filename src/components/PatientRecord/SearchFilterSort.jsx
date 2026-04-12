@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Calendar, ArrowDownAZ, SortDesc } from "lucide-react";
+import { Search, Calendar, SortDesc } from "lucide-react";
 
 export default function SearchFilterSort({ records, onFiltered }) {
   const [searchText, setSearchText] = useState("");
@@ -38,7 +38,7 @@ export default function SearchFilterSort({ records, onFiltered }) {
     }
 
     onFiltered(filtered, searchText);
-  }, [records, searchText, sortOption, startDate, endDate]);
+  }, [onFiltered, records, searchText, sortOption, startDate, endDate]);
 
   return (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 group focus-within:border-primary-300 transition-colors">

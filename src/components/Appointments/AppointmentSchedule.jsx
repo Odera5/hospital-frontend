@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { Calendar as CalendarIcon, Clock, User, FileText, CheckCircle, Trash2, Edit2, Plus, AlertCircle } from "lucide-react";
 import api from "../../services/api";
 import Toast from "../Toast";
@@ -136,7 +136,7 @@ export default function AppointmentSchedule({ patientId = null }) {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <AnimatePresence>
             {appointments.map((apt) => (
-              <motion.div key={getEntityId(apt)} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.2 }}>
+              <div key={getEntityId(apt)}>
                 <Card className="h-full hover:shadow-md transition-shadow relative overflow-hidden group">
                   <div className={`absolute top-0 left-0 w-1.5 h-full ${getStatusStyle(apt.status).split(' ')[0]}`} />
                   <CardContent className="p-5 pl-7 flex flex-col h-full gap-4">
@@ -193,7 +193,7 @@ export default function AppointmentSchedule({ patientId = null }) {
                     </div>
                   </CardContent>
                 </Card>
-              </motion.div>
+              </div>
             ))}
           </AnimatePresence>
         </div>
