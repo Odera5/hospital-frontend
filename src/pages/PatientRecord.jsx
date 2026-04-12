@@ -152,7 +152,7 @@ export default function PatientRecord() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-surface-200">
         <div>
           <div className="flex items-center gap-2 mb-4">
-             <Button variant="outline" size="sm" onClick={() => navigate(returnTo === "/waiting-room" ? "/waiting-room" : "/dashboard")} className="bg-white border-slate-200"><ArrowLeft size={16} className="mr-1" /> Back</Button>
+             <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="bg-white border-slate-200"><ArrowLeft size={16} className="mr-1" /> Back</Button>
           </div>
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-1 flex items-center">{patient.name}</h2>
           <div className="text-sm font-medium text-slate-500 flex items-center flex-wrap gap-x-4 gap-y-1 mt-2">

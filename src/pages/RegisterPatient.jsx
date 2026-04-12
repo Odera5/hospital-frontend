@@ -180,7 +180,7 @@ export default function RegisterPatient() {
                 <Button type="submit" size="lg" isLoading={loading} className="w-full sm:w-auto whitespace-nowrap">
                   Complete Registration
                 </Button>
-                <Button type="button" variant="ghost" size="lg" onClick={() => navigate("/dashboard")} disabled={loading} className="w-full sm:w-auto whitespace-nowrap">
+                <Button type="button" variant="ghost" size="lg" onClick={() => navigate(-1)} disabled={loading} className="w-full sm:w-auto whitespace-nowrap">
                   Cancel
                 </Button>
               </div>
