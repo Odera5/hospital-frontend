@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
-  Users, Calendar, Activity, CreditCard, Search, RefreshCw, ArchiveRestore, Trash2
+  Users, Calendar, Activity, CreditCard, Search, RefreshCw, ArchiveRestore, Trash2, Upload
 } from "lucide-react";
+import CsvImportModal from "../components/Patients/CsvImportModal";
 import api from "../services/api";
 import Toast from "../components/Toast";
 import { getEntityId } from "../utils/entityId";
@@ -54,10 +55,17 @@ export default function Dashboard() {
   const [toast, setToast] = useState(null);
   const [currentDay, setCurrentDay] = useState(formatLocalDateKey());
   const [currentPage, setCurrentPage] = useState(1);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const showTrash = location.search.includes("tab=trash");
 
   const showToast = (message, type = "success") => setToast({ message, type });
+
+  const handleImportSuccess = (count) => {
+    setShowImportModal(false);
+    showToast(`Successfully imported ${count} legacy patient records!`);
+    fetchPatients();
+  };
 
   const fetchPatients = async () => {
     try {
@@ -220,6 +228,12 @@ export default function Dashboard() {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="p-6 md:p-8 space-y-8 h-full">
       {toast && <Toast message={toast.message} type={toast.type} duration={3000} onClose={() => setToast(null)} />}
+      {showImportModal && (
+        <CsvImportModal 
+          onClose={() => setShowImportModal(false)}
+          onSuccess={handleImportSuccess}
+        />
+      )}
 
       {!showTrash && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
@@ -292,14 +306,21 @@ export default function Dashboard() {
           <h2 className="text-lg font-semibold text-slate-800">
             {showTrash ? "Deleted Records" : "Patient Directory"}
           </h2>
-          <div className="w-full sm:w-72">
-            <Input 
-              placeholder="Search by name or card..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              icon={Search}
-              className="bg-white h-10"
-            />
+          <div className="flex flex-col sm:flex-row-reverse gap-3 items-center w-full sm:w-auto">
+            {!showTrash && canViewRecords && (
+              <Button variant="outline" onClick={() => setShowImportModal(true)} className="w-full sm:w-auto bg-white shadow-sm border-slate-300">
+                <Upload size={16} className="mr-2" /> Import CSV
+              </Button>
+            )}
+            <div className="w-full sm:w-72">
+              <Input 
+                placeholder="Search by name or card..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                icon={Search}
+                className="bg-white h-10"
+              />
+            </div>
           </div>
         </div>
 
