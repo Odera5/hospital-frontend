@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Calendar, Activity, PenTool, Trash2, Edit2, Info, CheckCircle2, Clock } from "lucide-react";
+import { ChevronDown, ChevronUp, Calendar, Activity, PenTool, Trash2, Edit2, Info, CheckCircle2, Clock, FileText } from "lucide-react";
 import RecordForm from "./RecordForm";
 import Modal from "./Modal";
 import HighlightText from "../../utils/HighlightText";

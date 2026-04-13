@@ -6,6 +6,7 @@ import {
   LogOut, Trash2, Home, HeartPulse, Menu, X, Settings
 } from "lucide-react";
 import { logoutCurrentUser } from "../../services/api";
+import api from "../../services/api";
 import Button from "../ui/Button";
 
 export default function DashboardLayout() {
@@ -13,6 +14,8 @@ export default function DashboardLayout() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [appointmentCount, setAppointmentCount] = useState(0);
+  const [waitingCount, setWaitingCount] = useState(0);
 
   const storedUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user"))) || {};
   const user = {
@@ -24,6 +27,26 @@ export default function DashboardLayout() {
   const canViewRecords = ["admin", "doctor", "nurse"].includes(user.role);
 
   useEffect(() => {
+    const fetchCounts = async () => {
+      if (!canViewRecords) return;
+      try {
+        const resApt = await api.get(`/appointments?status=scheduled`);
+        setAppointmentCount(resApt.data.length || 0);
+
+        const resWait = await api.get(`/waiting-room`);
+        const activeWaiting = (resWait.data || []).filter(item => item.status === 'waiting' || item.status === 'called');
+        setWaitingCount(activeWaiting.length);
+      } catch (err) {
+        // ignore for badges
+      }
+    };
+    
+    fetchCounts();
+    const intervalId = setInterval(fetchCounts, 15000);
+    return () => clearInterval(intervalId);
+  }, [location.pathname, canViewRecords]);
+
+  useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60 * 1000);
     return () => clearInterval(timer);
   }, []);
@@ -33,7 +56,7 @@ export default function DashboardLayout() {
     navigate("/login");
   };
 
-  const NavItem = ({ icon: Icon, label, path, danger }) => {
+  const NavItem = ({ icon: Icon, label, path, danger, badge }) => {
     const active = location.pathname === path.split('?')[0] && (path.includes('tab=trash') ? location.search.includes('tab=trash') : !location.search.includes('tab=trash'));
     
     return (
@@ -49,6 +72,11 @@ export default function DashboardLayout() {
       >
         <Icon size={20} className={active && !danger ? "text-primary-600" : ""} />
         {label}
+        {badge !== undefined && badge > 0 && (
+          <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center justify-center min-w-[20px] shadow-sm">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
       </button>
     );
   };
@@ -102,8 +130,8 @@ export default function DashboardLayout() {
             {canViewRecords && (
               <>
                 <NavItem icon={UserPlus} label="Register Patient" path="/register-patient" />
-                <NavItem icon={Calendar} label="Appointments" path="/appointments" />
-                <NavItem icon={Clock} label="Waiting Room" path="/waiting-room" />
+                <NavItem icon={Calendar} label="Appointments" path="/appointments" badge={appointmentCount} />
+                <NavItem icon={Clock} label="Waiting Room" path="/waiting-room" badge={waitingCount} />
                 <NavItem icon={CreditCard} label="Billing" path="/billing" />
               </>
             )}

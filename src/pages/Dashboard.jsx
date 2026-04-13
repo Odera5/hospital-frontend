@@ -242,7 +242,10 @@ export default function Dashboard() {
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-medium text-slate-500">Appointments</p>
-                  <h3 className="text-3xl font-bold text-slate-900 mt-2">{appointmentsToday}</h3>
+                  <h3 className="text-3xl font-bold text-slate-900 mt-2 flex items-center">
+                    {appointmentsToday}
+                    <span className="ml-3 text-xs font-bold uppercase tracking-widest bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full shadow-sm">New</span>
+                  </h3>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-xl text-blue-600">
                   <Calendar size={24} />
