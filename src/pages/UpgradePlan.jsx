@@ -101,7 +101,6 @@ export default function UpgradePlan() {
              <FeatureItem included>2 Staff Accounts</FeatureItem>
              <FeatureItem included>Manual Appointments</FeatureItem>
              <FeatureItem included>Basic Clinical Records</FeatureItem>
-             <FeatureItem missing>Automated SMS Reminders</FeatureItem>
              <FeatureItem missing>Unlimited Storage (X-Ray Uploads)</FeatureItem>
              <FeatureItem missing>Advanced Analytics</FeatureItem>
            </div>
@@ -146,7 +145,6 @@ export default function UpgradePlan() {
            <div className="space-y-4 flex-1">
              <FeatureItem included dark highlight>Unlimited Patients</FeatureItem>
              <FeatureItem included dark highlight>Unlimited Staff Accounts</FeatureItem>
-             <FeatureItem included dark highlight icon={<MessageSquare size={18} />}>Automated SMS & Email Reminders</FeatureItem>
              <FeatureItem included dark highlight icon={<FileUp size={18} />}>Unlimited X-Ray & File Uploads</FeatureItem>
              <FeatureItem included dark highlight icon={<BookOpen size={18} />}>1-Click Dental Formulary</FeatureItem>
              <FeatureItem included dark highlight>Online Patient Intake Forms</FeatureItem>

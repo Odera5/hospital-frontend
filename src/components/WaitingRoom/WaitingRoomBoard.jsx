@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
-import { Users, Activity, CheckCircle, ChevronDown, ChevronUp, Bell, Search, LogOut, FileText, ArrowRight, UserPlus } from "lucide-react";
+import { Users, Activity, CheckCircle, ChevronDown, ChevronUp, Bell, Search, LogOut, FileText, ArrowRight, ArrowLeft, UserPlus } from "lucide-react";
 import api from "../../services/api";
 import Toast from "../Toast";
 import { getEntityId } from "../../utils/entityId";
@@ -160,8 +160,8 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
             <p className="text-sm text-slate-600 mt-1">Card: <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200">{newPatient.cardNumber || "Pending"}</span></p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <Button onClick={() => { if (preselectPatientId) setSelectedPatient(preselectPatientId); }} className="w-full sm:w-auto shadow-md">
-              Prepare Queue Entry
+            <Button variant="outline" onClick={() => navigate("/dashboard")} className="w-full sm:w-auto shadow-sm">
+              <ArrowLeft size={16} className="mr-2" /> Back
             </Button>
             {!isFrontDesk && (
               <Button variant="outline" onClick={() => handleOpenRecord(getEntityId(newPatient))} className="bg-white hover:bg-slate-100">
