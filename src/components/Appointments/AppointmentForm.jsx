@@ -6,15 +6,35 @@ import { getEntityId } from "../../utils/entityId";
 import Input from "../ui/Input";
 import Button from "../ui/Button";
 import { Card, CardContent } from "../ui/Card";
+import usePersistentState from "../../hooks/usePersistentState";
 
-export default function AppointmentForm({ patientId = null, appointment = null, onSuccess, onCancel }) {
+export default function AppointmentForm({ patientId = null, appointment = null, onSuccess, onCancel, draftStorageKey = "primuxcare:draft:appointment-form:new" }) {
   const dentistAssignmentEnabled = false;
-  const [formData, setFormData] = useState({
-    patientId: patientId || "", appointmentDate: "", timeSlot: "",
-    appointmentType: "checkup", duration: 30, notes: "", dentistId: "",
-  });
-  const [patientMode, setPatientMode] = useState(patientId ? "existing" : "existing");
-  const [newPatient, setNewPatient] = useState({ name: "", age: "", gender: "other", phone: "", email: "", address: "" });
+  const [formData, setFormData, clearFormDraft] = usePersistentState(
+    `${draftStorageKey}:form`,
+    appointment
+      ? {
+          patientId: getEntityId(appointment.patientId),
+          appointmentDate: appointment.appointmentDate.split("T")[0],
+          timeSlot: appointment.timeSlot,
+          appointmentType: appointment.appointmentType,
+          duration: appointment.duration,
+          notes: appointment.notes || "",
+          dentistId: getEntityId(appointment.dentistId),
+        }
+      : {
+          patientId: patientId || "", appointmentDate: "", timeSlot: "",
+          appointmentType: "checkup", duration: 30, notes: "", dentistId: "",
+        },
+  );
+  const [patientMode, setPatientMode, clearPatientModeDraft] = usePersistentState(
+    `${draftStorageKey}:mode`,
+    "existing",
+  );
+  const [newPatient, setNewPatient, clearNewPatientDraft] = usePersistentState(
+    `${draftStorageKey}:patient`,
+    { name: "", age: "", gender: "other", phone: "", email: "", address: "" },
+  );
   const [patients, setPatients] = useState([]);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -42,20 +62,9 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
     } finally {
       setSlotLoading(false);
     }
-  }, [appointment, formData.appointmentDate, formData.duration]);
+  }, [appointment, formData.appointmentDate, formData.duration, setFormData]);
 
   useEffect(() => { fetchPatients(); }, [fetchPatients]);
-
-  useEffect(() => {
-    if (appointment) {
-      setFormData({
-        patientId: getEntityId(appointment.patientId),
-        appointmentDate: appointment.appointmentDate.split("T")[0],
-        timeSlot: appointment.timeSlot, appointmentType: appointment.appointmentType,
-        duration: appointment.duration, notes: appointment.notes || "", dentistId: getEntityId(appointment.dentistId),
-      });
-    }
-  }, [appointment]);
 
   useEffect(() => {
     if (formData.appointmentDate) fetchAvailableSlots();
@@ -84,6 +93,9 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
       if (appointment) await api.put(`/appointments/${getEntityId(appointment)}`, payload);
       else await api.post("/appointments", payload);
 
+      clearFormDraft();
+      clearPatientModeDraft();
+      clearNewPatientDraft();
       setToast({ show: true, message: appointment ? "Appointment updated" : "Appointment scheduled", type: "success" });
       setTimeout(() => { onSuccess(); }, 1000);
     } catch (error) {

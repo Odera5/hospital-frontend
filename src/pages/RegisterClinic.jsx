@@ -5,6 +5,7 @@ import { Building2, Phone, MapPin, Mail, Lock, HeartPulse, User } from "lucide-r
 import api from "../services/api";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
+import usePersistentState from "../hooks/usePersistentState";
 
 const initialForm = {
   clinicName: "",
@@ -18,7 +19,11 @@ const initialForm = {
 };
 
 export default function RegisterClinic() {
-  const [form, setForm] = useState(initialForm);
+  const MotionDiv = motion.div;
+  const [form, setForm, clearFormDraft] = usePersistentState(
+    "primuxcare:draft:register-clinic",
+    initialForm,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -65,9 +70,8 @@ export default function RegisterClinic() {
         response.data?.message ||
           "Clinic registered successfully. Please check the admin email inbox to confirm the address and activate the account.",
       );
-      setForm(initialForm);
+      clearFormDraft();
     } catch (err) {
-      const status = err.response?.status;
       const responseData = err.response?.data;
 
       if (responseData?.code === "CLINIC_EMAIL_EXISTS") {
@@ -100,7 +104,7 @@ export default function RegisterClinic() {
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div className="absolute inset-0 z-20 flex flex-col items-start justify-center space-y-8 px-16 text-white">
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
@@ -116,13 +120,13 @@ export default function RegisterClinic() {
             <p className="max-w-md text-lg text-primary-50/80">
               Each clinic gets its own staff accounts and patient data space. Patient records, appointments, and billing stay perfectly isolated and secure within your clinic.
             </p>
-          </motion.div>
+          </MotionDiv>
         </div>
       </div>
 
       {/* Right side - Form */}
       <div className="flex w-full overflow-y-auto px-4 py-12 lg:w-[55%] lg:px-12 xl:px-24">
-        <motion.div
+        <MotionDiv
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
@@ -143,23 +147,23 @@ export default function RegisterClinic() {
           </div>
 
           {error && (
-            <motion.div
+            <MotionDiv
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               className="rounded-xl bg-red-50 p-4 text-sm text-red-600 border border-red-100"
             >
               {error}
-            </motion.div>
+            </MotionDiv>
           )}
 
           {success && (
-            <motion.div
+            <MotionDiv
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               className="rounded-xl bg-primary-50 p-4 text-sm text-primary-700 border border-primary-100"
             >
               {success}
-            </motion.div>
+            </MotionDiv>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -272,7 +276,7 @@ export default function RegisterClinic() {
               Need support? <Link to="/support" className="font-medium text-primary-600 hover:text-primary-700 hover:underline">Contact us</Link>
             </p>
           </div>
-        </motion.div>
+        </MotionDiv>
       </div>
     </div>
   );

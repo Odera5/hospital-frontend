@@ -7,13 +7,17 @@ import { getEntityId } from "../../utils/entityId";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
 import { Card, CardContent } from "../ui/Card";
+import usePersistentState from "../../hooks/usePersistentState";
 
-export default function InvoiceForm({ patientId = null, onSuccess, onCancel }) {
-  const [formData, setFormData] = useState({
-    patientId: patientId || "",
-    items: [{ description: "", category: "service", quantity: 1, unitPrice: 0, totalPrice: 0 }],
-    taxPercentage: 0, discount: 0, dueDate: "", notes: "",
-  });
+export default function InvoiceForm({ patientId = null, onSuccess, onCancel, draftStorageKey = "primuxcare:draft:invoice-form:new" }) {
+  const [formData, setFormData, clearFormDraft] = usePersistentState(
+    `${draftStorageKey}:form`,
+    {
+      patientId: patientId || "",
+      items: [{ description: "", category: "service", quantity: 1, unitPrice: 0, totalPrice: 0 }],
+      taxPercentage: 0, discount: 0, dueDate: "", notes: "",
+    },
+  );
 
   const [patients, setPatients] = useState([]);
   const [procedurePresets, setProcedurePresets] = useState(DEFAULT_PROCEDURE_PRESETS);
@@ -57,6 +61,7 @@ export default function InvoiceForm({ patientId = null, onSuccess, onCancel }) {
     setLoading(true);
     try {
       await api.post("/invoices", formData);
+      clearFormDraft();
       setToast({ show: true, message: "Invoice created successfully", type: "success" });
       setTimeout(() => { onSuccess(); }, 1500);
     } catch (error) {

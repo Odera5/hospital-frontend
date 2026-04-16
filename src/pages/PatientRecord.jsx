@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Plus, UserCog, ArrowLeft, Activity, User, Phone, MapPin, Hash } from "lucide-react";
 import api from "../services/api";
 import Toast from "../components/Toast";
 import Modal from "../components/PatientRecord/Modal";
+import ConfirmModal from "../components/ui/ConfirmModal";
 import RecordForm from "../components/PatientRecord/RecordForm";
 import RecordItem from "../components/PatientRecord/RecordItem";
 import SearchFilterSort from "../components/PatientRecord/SearchFilterSort";
@@ -13,33 +14,49 @@ import { getEntityId } from "../utils/entityId";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { Card, CardContent } from "../components/ui/Card";
+import usePersistentState from "../hooks/usePersistentState";
+import { readStoredJson } from "../utils/persistence";
 
 const RECORDS_PER_PAGE = 10;
 
 export default function PatientRecord() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const storedUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user"))) || {};
   const canEditPatient = storedUser.role === "admin" || storedUser.role === "doctor";
   const canManageRecords = storedUser.role === "admin" || storedUser.role === "doctor";
-  const returnTo = location.state?.returnTo || null;
+  const patientEditDraftKey = `primuxcare:draft:patient-edit:${id}`;
+  const patientEditModalKey = `primuxcare:draft:patient-edit-modal:${id}`;
+  const hasSavedPatientEditDraft = Boolean(readStoredJson(patientEditDraftKey, null));
 
   const [patient, setPatient] = useState(null);
   const [records, setRecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
-  const [patientForm, setPatientForm] = useState({ name: "", cardNumber: "", age: "", gender: "other", phone: "", email: "", address: "" });
+  const [patientForm, setPatientForm, clearPatientFormDraft] = usePersistentState(
+    patientEditDraftKey,
+    { name: "", cardNumber: "", age: "", gender: "other", phone: "", email: "", address: "" },
+  );
 
-  const [newRecord, setNewRecord] = useState(createEmptyRecord());
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditPatientModal, setShowEditPatientModal] = useState(false);
+  const [newRecord, setNewRecord, clearNewRecordDraft] = usePersistentState(
+    `primuxcare:draft:patient-record:new:${id}`,
+    createEmptyRecord(),
+  );
+  const [showAddModal, setShowAddModal, clearShowAddModalDraft] = usePersistentState(
+    `primuxcare:draft:patient-record:new-modal:${id}`,
+    false,
+  );
+  const [showEditPatientModal, setShowEditPatientModal, clearShowEditPatientModalDraft] = usePersistentState(
+    patientEditModalKey,
+    false,
+  );
   const [expandedRecordId, setExpandedRecordId] = useState(null);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [addLoading, setAddLoading] = useState(false);
   const [patientSaveLoading, setPatientSaveLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [confirmConfig, setConfirmConfig] = useState(null);
 
   const showToast = (message, type = "success") => setToast({ show: true, message, type });
 
@@ -52,7 +69,7 @@ export default function PatientRecord() {
     const formData = new FormData();
     Object.keys(recordData).forEach((key) => {
       if (key === "attachments") {
-        recordData.attachments.forEach((file) => { if (file instanceof File) formData.append("attachments", file); });
+        (recordData.attachments || []).forEach((file) => { if (file instanceof File) formData.append("attachments", file); });
       } else if (key === "teeth") {
         formData.append("teeth", JSON.stringify(recordData.teeth || []));
       } else {
@@ -69,18 +86,20 @@ export default function PatientRecord() {
         setLoading(true);
         const resPatient = await api.get(`/patients/${id}`);
         setPatient(resPatient.data);
-        setPatientForm({
-          name: resPatient.data?.name || "", cardNumber: resPatient.data?.cardNumber || "",
-          age: resPatient.data?.age || "", gender: resPatient.data?.gender || "other",
-          phone: resPatient.data?.phone || "", email: resPatient.data?.email || "", address: resPatient.data?.address || "",
-        });
+        if (!hasSavedPatientEditDraft) {
+          setPatientForm({
+            name: resPatient.data?.name || "", cardNumber: resPatient.data?.cardNumber || "",
+            age: resPatient.data?.age || "", gender: resPatient.data?.gender || "other",
+            phone: resPatient.data?.phone || "", email: resPatient.data?.email || "", address: resPatient.data?.address || "",
+          });
+        }
         const resRecords = await api.get(`/patients/${id}/records`);
         setRecords(resRecords.data);
         setFilteredRecords(resRecords.data);
-      } catch (err) { showToast("Failed to fetch patient data", "error"); } finally { setLoading(false); }
+      } catch { showToast("Failed to fetch patient data", "error"); } finally { setLoading(false); }
     };
     fetchPatient();
-  }, [id]);
+  }, [hasSavedPatientEditDraft, id, setPatientForm]);
 
   const handleAddRecord = async (recordData) => {
     try {
@@ -94,8 +113,7 @@ export default function PatientRecord() {
     } catch (err) { showToast(err.response?.data?.message || "Failed to add record", "error"); return false; } finally { setAddLoading(false); }
   };
 
-  const handleDeleteRecord = async (recordId) => {
-    if (!window.confirm("Are you sure you want to delete this record?")) return;
+  const executeDeleteRecord = async (recordId) => {
     try {
       await api.delete(`/patients/${id}/records/${recordId}`);
       const updatedRecords = records.filter((r) => getEntityId(r) !== recordId);
@@ -103,6 +121,16 @@ export default function PatientRecord() {
       setFilteredRecords(updatedRecords);
       showToast("Record deleted successfully!", "success");
     } catch (err) { showToast(err.response?.data?.message || "Failed to delete record", "error"); }
+  };
+
+  const handleDeleteRecord = (recordId) => {
+    setConfirmConfig({
+      title: "Delete Clinical Record",
+      message: "Are you sure you want to delete this clinical record? This action cannot be undone.",
+      confirmText: "Delete Record",
+      danger: true,
+      onConfirm: () => executeDeleteRecord(recordId)
+    });
   };
 
   const handleSaveEdit = async (recordId, updatedData, removedAttachments = []) => {
@@ -136,6 +164,8 @@ export default function PatientRecord() {
       setPatientSaveLoading(true);
       const res = await api.put(`/patients/${id}`, patientForm);
       setPatient(res.data);
+      clearPatientFormDraft();
+      clearShowEditPatientModalDraft();
       setShowEditPatientModal(false);
       showToast("Patient information updated successfully!");
     } catch (err) { showToast(err.response?.data?.message || "Failed to update patient information", "error"); } finally { setPatientSaveLoading(false); }
@@ -172,7 +202,7 @@ export default function PatientRecord() {
         </div>
       </div>
 
-      <SearchFilterSort records={records} onFiltered={handleFiltered} />
+      <SearchFilterSort records={records} onFiltered={handleFiltered} storageKey={`primuxcare:draft:patient-record:filters:${id}`} />
 
       <div className="space-y-4">
         {filteredRecords.length === 0 ? (
@@ -202,17 +232,17 @@ export default function PatientRecord() {
       )}
 
       {showAddModal && (
-        <Modal onClose={() => setShowAddModal(false)}>
+        <Modal onClose={() => { clearShowAddModalDraft(); setShowAddModal(false); }}>
           <div className="mb-6 border-b border-slate-100 pb-4">
             <h2 className="text-2xl font-bold text-slate-900">New Clinical Record</h2>
             <p className="text-slate-500 text-sm mt-1">Add history, examinations, dental charting and treatment plan.</p>
           </div>
-          <RecordForm recordData={newRecord} setRecordData={setNewRecord} onSubmit={async (e) => { e.preventDefault(); const ok = await handleAddRecord(newRecord); if (ok) { setNewRecord(createEmptyRecord()); setShowAddModal(false); } }} submitLabel="Save Record" loading={addLoading} />
+          <RecordForm recordData={newRecord} setRecordData={setNewRecord} onSubmit={async (e) => { e.preventDefault(); const ok = await handleAddRecord(newRecord); if (ok) { clearNewRecordDraft(); clearShowAddModalDraft(); setShowAddModal(false); } }} submitLabel="Save Record" loading={addLoading} />
         </Modal>
       )}
 
       {showEditPatientModal && (
-        <Modal onClose={() => setShowEditPatientModal(false)}>
+        <Modal onClose={() => { clearPatientFormDraft(); clearShowEditPatientModalDraft(); setShowEditPatientModal(false); }}>
           <div className="mb-6 border-b border-slate-100 pb-4">
             <h2 className="text-2xl font-bold text-slate-900">Edit Patient Details</h2>
           </div>
@@ -227,7 +257,7 @@ export default function PatientRecord() {
               <div className="sm:col-span-2 space-y-1.5"><label className="text-sm font-semibold text-slate-700 leading-none">Home Address</label><textarea name="address" value={patientForm.address} onChange={handlePatientFormChange} disabled={patientSaveLoading} rows="2" className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm resize-none" /></div>
             </div>
             <div className="flex gap-4 pt-4 border-t border-slate-100">
-              <Button type="button" variant="ghost" onClick={() => setShowEditPatientModal(false)} disabled={patientSaveLoading} className="flex-1">Cancel</Button>
+              <Button type="button" variant="ghost" onClick={() => { clearPatientFormDraft(); clearShowEditPatientModalDraft(); setShowEditPatientModal(false); }} disabled={patientSaveLoading} className="flex-1">Cancel</Button>
               <Button type="submit" isLoading={patientSaveLoading} className="flex-1 shadow-md">Save Changes</Button>
             </div>
           </form>
@@ -235,6 +265,11 @@ export default function PatientRecord() {
       )}
       
       {toast.show && <Toast message={toast.message} type={toast.type} duration={3000} onClose={() => setToast({ ...toast, show: false })} />}
+      <ConfirmModal 
+        isOpen={!!confirmConfig} 
+        onClose={() => setConfirmConfig(null)} 
+        {...confirmConfig} 
+      />
     </motion.div>
   );
 }

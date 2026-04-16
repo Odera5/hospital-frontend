@@ -5,16 +5,20 @@ import { Mail, Lock, HeartPulse } from "lucide-react";
 import api from "../services/api";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
+import { clearLastVisitedRoute, readLastVisitedRoute } from "../utils/persistence";
+import usePersistentState from "../hooks/usePersistentState";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [loginDraft, setLoginDraft, clearLoginDraft] = usePersistentState(
+    "primuxcare:draft:login",
+    { email: "", password: "", rememberMe: false },
+  );
+  const [error, setError] = usePersistentState("primuxcare:draft:login:error", "");
+  const [success, setSuccess] = usePersistentState("primuxcare:draft:login:success", "");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const navigate = useNavigate();
+  const { email, password, rememberMe } = loginDraft;
   
   const canResendVerification = error === "Please confirm your email address to activate your account before signing in.";
 
@@ -38,8 +42,15 @@ export default function Login() {
       storage.setItem("accessToken", token);
       storage.setItem("refreshToken", refreshToken);
       storage.setItem("user", JSON.stringify(user));
+      clearLoginDraft();
+      setError("");
+      setSuccess("");
 
-      navigate("/dashboard");
+      const destination = readLastVisitedRoute() || "/dashboard";
+      if (destination === "/dashboard") {
+        clearLastVisitedRoute();
+      }
+      navigate(destination, { replace: true });
     } catch (err) {
       console.error("Login error:", err.response?.data || err.message || err);
       setError(
@@ -154,7 +165,7 @@ export default function Login() {
               type="email"
               icon={Mail}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => setLoginDraft((current) => ({ ...current, email: e.target.value }))}
               placeholder="name@clinic.com"
               required
             />
@@ -164,7 +175,7 @@ export default function Login() {
               type="password"
               icon={Lock}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => setLoginDraft((current) => ({ ...current, password: e.target.value }))}
               placeholder="••••••••"
               required
             />
@@ -175,7 +186,7 @@ export default function Login() {
                   type="checkbox"
                   className="h-4 w-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
                   checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
+                  onChange={(e) => setLoginDraft((current) => ({ ...current, rememberMe: e.target.checked }))}
                 />
                 <span className="ml-2 text-sm text-slate-600">Remember me</span>
               </label>

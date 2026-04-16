@@ -65,7 +65,11 @@ api.interceptors.response.use(
       }
     }
 
-    if (error.response?.status === 401) {
+    if (
+      error.response?.status === 401 &&
+      !isAuthEndpoint &&
+      !isRefreshEndpoint
+    ) {
       clearAuthState();
       window.location.href = "/login";
     }

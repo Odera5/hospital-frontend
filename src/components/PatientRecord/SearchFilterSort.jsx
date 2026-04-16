@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { Search, Calendar, SortDesc } from "lucide-react";
+import usePersistentState from "../../hooks/usePersistentState";
 
-export default function SearchFilterSort({ records, onFiltered }) {
-  const [searchText, setSearchText] = useState("");
-  const [sortOption, setSortOption] = useState("recent");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+export default function SearchFilterSort({ records, onFiltered, storageKey = "primuxcare:draft:record-search" }) {
+  const [filters, setFilters] = usePersistentState(storageKey, {
+    searchText: "",
+    sortOption: "recent",
+    startDate: "",
+    endDate: "",
+  });
+  const { searchText, sortOption, startDate, endDate } = filters;
+  const updateFilters = (patch) =>
+    setFilters((current) => ({ ...current, ...patch }));
 
   useEffect(() => {
     let filtered = [...records];
@@ -49,7 +55,7 @@ export default function SearchFilterSort({ records, onFiltered }) {
             type="text"
             placeholder="Search by complaint, diagnosis or history..."
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
+            onChange={(e) => updateFilters({ searchText: e.target.value })}
             className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-2.5 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm transition-colors"
           />
         </div>
@@ -59,7 +65,7 @@ export default function SearchFilterSort({ records, onFiltered }) {
           <input
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => updateFilters({ startDate: e.target.value })}
             className="w-full rounded-xl border border-slate-200 px-3 py-2.5 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
           />
         </div>
@@ -69,7 +75,7 @@ export default function SearchFilterSort({ records, onFiltered }) {
           <input
             type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={(e) => updateFilters({ endDate: e.target.value })}
             className="w-full rounded-xl border border-slate-200 px-3 py-2.5 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
           />
         </div>
@@ -78,7 +84,7 @@ export default function SearchFilterSort({ records, onFiltered }) {
           <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1 ml-1 flex items-center"><SortDesc size={12} className="mr-1"/> Sort By</label>
           <select
             value={sortOption}
-            onChange={(e) => setSortOption(e.target.value)}
+            onChange={(e) => updateFilters({ sortOption: e.target.value })}
             className="w-full rounded-xl border border-slate-200 pl-3 pr-8 py-2.5 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm appearance-none"
           >
             <option value="recent">Most Recent First</option>

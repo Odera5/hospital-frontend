@@ -7,16 +7,22 @@ import Toast from "../components/Toast";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import { Card, CardContent } from "../components/ui/Card";
+import usePersistentState from "../hooks/usePersistentState";
+
+const emptyPatientForm = {
+  name: "",
+  age: "",
+  email: "",
+  gender: "other",
+  phone: "",
+  address: "",
+};
 
 export default function RegisterPatient() {
-  const [form, setForm] = useState({
-    name: "",
-    age: "",
-    email: "",
-    gender: "other",
-    phone: "",
-    address: "",
-  });
+  const [form, setForm, clearFormDraft] = usePersistentState(
+    "primuxcare:draft:register-patient",
+    emptyPatientForm,
+  );
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -51,7 +57,7 @@ export default function RegisterPatient() {
 
       showToast(`Patient "${res.data.name}" added successfully!`, "success");
 
-      setForm({ name: "", age: "", email: "", gender: "other", phone: "", address: "" });
+      clearFormDraft();
 
       navigate("/waiting-room", {
         state: {

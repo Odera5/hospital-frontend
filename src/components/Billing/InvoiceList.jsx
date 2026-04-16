@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { CreditCard, FileText, DollarSign, AlertCircle, Plus, Search, ChevronDown, CheckCircle, Printer, ArrowLeft, Activity } from "lucide-react";
 import api from "../../services/api";
@@ -8,6 +8,7 @@ import { getEntityId } from "../../utils/entityId";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
 import { Card, CardContent } from "../ui/Card";
+import usePersistentState from "../../hooks/usePersistentState";
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 2 }).format(Number(value) || 0);
@@ -187,24 +188,30 @@ export default function InvoiceList({ patientId = null }) {
   const [invoices, setInvoices] = useState([]);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [uiState, setUiState, clearUiState] = usePersistentState(
+    `primuxcare:draft:invoice-list:${patientId || "general"}`,
+    {
+      showForm: false,
+      filterStatus: "all",
+      searchQuery: "",
+      selectedPatientId: patientId || "",
+    },
+  );
+  const { showForm, filterStatus, searchQuery, selectedPatientId } = uiState;
   const [viewingInvoice, setViewingInvoice] = useState(null);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPatientId, setSelectedPatientId] = useState(patientId || "");
   const [report, setReport] = useState(null);
 
-  useEffect(() => { fetchInvoices(); fetchReport(); fetchPatients(); }, [patientId]);
-
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
     try { setLoading(true); const params = new URLSearchParams(); if (patientId) params.append("patientId", patientId); const response = await api.get(`/invoices?${params}`); setInvoices(response.data || []); } catch (error) { setToast({ show: true, message: error.response?.data?.message || "Failed to fetch invoices", type: "error" }); } finally { setLoading(false); }
-  };
+  }, [patientId]);
 
-  const fetchReport = async () => { try { const response = await api.get("/invoices/report"); setReport(response.data); } catch (error) { console.error(error); } };
-  const fetchPatients = async () => { try { const response = await api.get("/patients"); setPatients((response.data || []).filter((p) => !p.isDeleted)); } catch (error) { console.error(error); } };
+  const fetchReport = useCallback(async () => { try { const response = await api.get("/invoices/report"); setReport(response.data); } catch (error) { console.error(error); } }, []);
+  const fetchPatients = useCallback(async () => { try { const response = await api.get("/patients"); setPatients((response.data || []).filter((p) => !p.isDeleted)); } catch (error) { console.error(error); } }, []);
 
-  const handleFormSuccess = () => { setShowForm(false); setViewingInvoice(null); fetchInvoices(); fetchReport(); };
+  useEffect(() => { fetchInvoices(); fetchReport(); fetchPatients(); }, [fetchInvoices, fetchPatients, fetchReport]);
+
+  const handleFormSuccess = () => { clearUiState(); setViewingInvoice(null); fetchInvoices(); fetchReport(); };
   const handleIssueInvoice = async (id) => {
     try { await api.put(`/invoices/${id}/issue`); setToast({ show: true, message: "Invoice issued", type: "success" }); fetchInvoices(); fetchReport(); } catch (error) { setToast({ show: true, message: error.response?.data?.message || "Failed to issue", type: "error" }); }
   };
@@ -247,7 +254,7 @@ export default function InvoiceList({ patientId = null }) {
     return { outstandingPatients: patientSummaries.filter((s) => s.outstanding > 0).length, dueToday: dueToday.length, drafts: invoices.filter((i) => i.status === "draft").length };
   }, [invoices, patientSummaries]);
 
-  if (showForm) return <InvoiceForm patientId={selectedPatientId || patientId} onSuccess={handleFormSuccess} onCancel={() => setShowForm(false)} />;
+  if (showForm) return <InvoiceForm patientId={selectedPatientId || patientId} draftStorageKey={`primuxcare:draft:invoice-form:${selectedPatientId || patientId || "new"}`} onSuccess={handleFormSuccess} onCancel={() => clearUiState()} />;
   if (viewingInvoice) return <InvoiceViewer invoice={viewingInvoice} onClose={() => { setViewingInvoice(null); fetchInvoices(); fetchReport(); }} />;
 
   return (
@@ -257,7 +264,7 @@ export default function InvoiceList({ patientId = null }) {
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 mb-2">Billing & Collections</h2>
           <p className="text-sm text-slate-500 max-w-xl">Create invoices, manage outstanding balances, and record payments.</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="w-full md:w-auto shadow-md"><Plus size={18} className="mr-2" /> New Invoice</Button>
+        <Button onClick={() => setUiState((current) => ({ ...current, showForm: true }))} className="w-full md:w-auto shadow-md"><Plus size={18} className="mr-2" /> New Invoice</Button>
       </div>
 
       {report && !patientId && (
@@ -275,17 +282,17 @@ export default function InvoiceList({ patientId = null }) {
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="md:col-span-1">
-                  <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search records..." icon={Search} className="bg-slate-50" />
+                  <Input value={searchQuery} onChange={(e) => setUiState((current) => ({ ...current, searchQuery: e.target.value }))} placeholder="Search records..." icon={Search} className="bg-slate-50" />
                 </div>
                 <div>
                    <div className="relative">
-                      <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 bg-slate-50 text-sm focus:ring-primary-500 shadow-sm appearance-none h-[46px]"><option value="all">All Statuses</option><option value="draft">Drafts</option><option value="issued">Issued</option><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="cancelled">Cancelled</option></select>
+                      <select value={filterStatus} onChange={(e) => setUiState((current) => ({ ...current, filterStatus: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-3 bg-slate-50 text-sm focus:ring-primary-500 shadow-sm appearance-none h-[46px]"><option value="all">All Statuses</option><option value="draft">Drafts</option><option value="issued">Issued</option><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="cancelled">Cancelled</option></select>
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"><ChevronDown size={16} className="text-slate-400" /></div>
                    </div>
                 </div>
                 <div>
                    <div className="relative">
-                      <select value={selectedPatientId} onChange={(e) => setSelectedPatientId(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 bg-slate-50 text-sm focus:ring-primary-500 shadow-sm appearance-none h-[46px]"><option value="">All Patients</option>{patients.map((p) => (<option key={getEntityId(p)} value={getEntityId(p)}>{p.name}</option>))}</select>
+                      <select value={selectedPatientId} onChange={(e) => setUiState((current) => ({ ...current, selectedPatientId: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-3 bg-slate-50 text-sm focus:ring-primary-500 shadow-sm appearance-none h-[46px]"><option value="">All Patients</option>{patients.map((p) => (<option key={getEntityId(p)} value={getEntityId(p)}>{p.name}</option>))}</select>
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"><ChevronDown size={16} className="text-slate-400" /></div>
                    </div>
                 </div>

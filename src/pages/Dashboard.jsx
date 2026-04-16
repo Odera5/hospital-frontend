@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
@@ -12,6 +12,8 @@ import { getEntityId } from "../utils/entityId";
 import { Card, CardContent } from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
+import ConfirmModal from "../components/ui/ConfirmModal";
+import usePersistentState from "../hooks/usePersistentState";
 
 const PATIENTS_PER_PAGE = 25;
 
@@ -50,14 +52,17 @@ export default function Dashboard() {
   const [waitingSummary, setWaitingSummary] = useState(defaultWaitingSummary);
   const [monthlyRevenue, setMonthlyRevenue] = useState(0);
   const [trash, setTrash] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+  const [directoryState, setDirectoryState] = usePersistentState(
+    "primuxcare:draft:dashboard-directory",
+    { searchQuery: "", sortConfig: { key: null, direction: "asc" }, currentPage: 1 },
+  );
+  const { searchQuery, sortConfig, currentPage } = directoryState;
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [currentDay, setCurrentDay] = useState(formatLocalDateKey());
-  const [currentPage, setCurrentPage] = useState(1);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState(null);
 
   const showTrash = location.search.includes("tab=trash");
   const clinicPlan = storedUser?.clinic?.plan || "FREE";
@@ -110,7 +115,7 @@ export default function Dashboard() {
     fetchPatients();
   };
 
-  const fetchPatients = async () => {
+  const fetchPatients = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get("/patients");
@@ -122,9 +127,9 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchTrash = async () => {
+  const fetchTrash = useCallback(async () => {
     if (user.role !== "admin") return;
     try {
       const res = await api.get("/patients/trash/all");
@@ -134,9 +139,9 @@ export default function Dashboard() {
       setTrash([]);
       if (!shouldSuppressDashboardError(err)) showToast("Failed to load trash", "error");
     }
-  };
+  }, [user.role]);
 
-  const fetchAppointmentsToday = async () => {
+  const fetchAppointmentsToday = useCallback(async () => {
     try {
       const today = formatLocalDateKey();
       const res = await api.get(`/appointments?startDate=${today}&endDate=${today}`);
@@ -146,9 +151,9 @@ export default function Dashboard() {
       setAppointmentsToday(0);
       if (!shouldSuppressDashboardError(err)) showToast("Failed to load today's appointments", "error");
     }
-  };
+  }, []);
 
-  const fetchWaitingSummary = async () => {
+  const fetchWaitingSummary = useCallback(async () => {
     try {
       const res = await api.get("/waiting-room/summary");
       setWaitingSummary(res.data || defaultWaitingSummary);
@@ -157,9 +162,9 @@ export default function Dashboard() {
       setWaitingSummary(defaultWaitingSummary);
       if (!shouldSuppressDashboardError(err)) showToast("Failed to load waiting room summary", "error");
     }
-  };
+  }, []);
 
-  const fetchMonthlyRevenue = async () => {
+  const fetchMonthlyRevenue = useCallback(async () => {
     try {
       const now = new Date();
       const startDate = formatLocalDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
@@ -171,7 +176,7 @@ export default function Dashboard() {
       setMonthlyRevenue(0);
       if (!shouldSuppressDashboardError(err)) showToast("Failed to load revenue summary", "error");
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchPatients();
@@ -179,7 +184,7 @@ export default function Dashboard() {
     fetchAppointmentsToday();
     fetchWaitingSummary();
     fetchMonthlyRevenue();
-  }, []);
+  }, [fetchAppointmentsToday, fetchMonthlyRevenue, fetchPatients, fetchTrash, fetchWaitingSummary]);
 
   useEffect(() => {
     if (location.state?.newPatient) {
@@ -200,7 +205,7 @@ export default function Dashboard() {
   const requestSort = (key) => {
     let direction = "asc";
     if (sortConfig.key === key && sortConfig.direction === "asc") direction = "desc";
-    setSortConfig({ key, direction });
+    setDirectoryState((current) => ({ ...current, sortConfig: { key, direction } }));
   };
 
   const sortedPatients = sortConfig.key
@@ -225,11 +230,16 @@ export default function Dashboard() {
   const pageStartIndex = (currentPageSafe - 1) * PATIENTS_PER_PAGE;
   const paginatedPatients = activeList.slice(pageStartIndex, pageStartIndex + PATIENTS_PER_PAGE);
 
-  useEffect(() => setCurrentPage(1), [searchQuery, showTrash, sortConfig]);
-  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
+  useEffect(() => {
+    setDirectoryState((current) => ({ ...current, currentPage: 1 }));
+  }, [searchQuery, setDirectoryState, showTrash, sortConfig]);
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setDirectoryState((current) => ({ ...current, currentPage: totalPages }));
+    }
+  }, [currentPage, setDirectoryState, totalPages]);
 
-  const handleDelete = async (patientId) => {
-    if (!window.confirm("Move this patient to Trash?")) return;
+  const executeDelete = async (patientId) => {
     try {
       const res = await api.delete(`/patients/${patientId}`);
       if (res.status === 200) {
@@ -240,6 +250,16 @@ export default function Dashboard() {
     } catch (err) {
       showToast(err.response?.data?.message || "Failed to delete patient", "error");
     }
+  };
+
+  const handleDelete = (patientId) => {
+    setConfirmConfig({
+      title: "Move to Trash",
+      message: "Move this patient to the Trash? You can restore them later if needed.",
+      confirmText: "Move to Trash",
+      danger: true,
+      onConfirm: () => executeDelete(patientId)
+    });
   };
 
   const handleRestore = async (patientId) => {
@@ -255,8 +275,7 @@ export default function Dashboard() {
     }
   };
 
-  const handlePermanentDelete = async (patientId) => {
-    if (!window.confirm("Permanently delete this patient?")) return;
+  const executePermanentDelete = async (patientId) => {
     try {
       const res = await api.delete(`/patients/${patientId}/permanent`);
       if (res.status === 200) {
@@ -266,6 +285,16 @@ export default function Dashboard() {
     } catch (err) {
       showToast(err.response?.data?.message || "Failed to permanently delete patient", "error");
     }
+  };
+
+  const handlePermanentDelete = (patientId) => {
+    setConfirmConfig({
+      title: "Delete Permanently",
+      message: "Permanently delete this patient? This action cannot be undone and all associated records will be lost.",
+      confirmText: "Delete Forever",
+      danger: true,
+      onConfirm: () => executePermanentDelete(patientId)
+    });
   };
 
   return (
@@ -366,7 +395,7 @@ export default function Dashboard() {
               <Input 
                 placeholder="Search by name or card..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => setDirectoryState((current) => ({ ...current, searchQuery: e.target.value }))}
                 icon={Search}
                 className="bg-white h-10"
               />
@@ -398,8 +427,22 @@ export default function Dashboard() {
                 </tr>
               ) : paginatedPatients.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-12 text-center text-slate-500">
-                    {searchQuery ? "No patients match your search." : (showTrash ? "Trash is empty." : "No patients found.")}
+                  <td colSpan="4" className="px-6 py-16 text-center text-slate-500">
+                     <div className="flex flex-col items-center justify-center space-y-3">
+                        <div className="bg-slate-50 p-4 rounded-full border border-slate-200 text-slate-400 mb-2">
+                          {showTrash ? <Trash2 size={32} /> : searchQuery ? <Search size={32} /> : <Users size={32} />}
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-700">
+                          {searchQuery ? "No matches found" : showTrash ? "Trash is empty" : "No patients yet"}
+                        </h3>
+                        <p className="text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
+                          {searchQuery 
+                            ? "We couldn't find any patients matching that search. Try adjusting your key words." 
+                            : showTrash 
+                              ? "Your deleted records will appear here. Currently, it's squeaky clean!" 
+                              : "Your clinic database is waiting. Start by securely registering your first patient!"}
+                        </p>
+                     </div>
                   </td>
                 </tr>
               ) : (
@@ -450,13 +493,13 @@ export default function Dashboard() {
             Showing <span className="font-medium text-slate-900">{activeList.length > 0 ? pageStartIndex + 1 : 0}</span> to <span className="font-medium text-slate-900">{Math.min(pageStartIndex + PATIENTS_PER_PAGE, activeList.length)}</span> of <span className="font-medium text-slate-900">{activeList.length}</span> results
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPageSafe <= 1}>
+            <Button variant="outline" size="sm" onClick={() => setDirectoryState((current) => ({ ...current, currentPage: Math.max(1, current.currentPage - 1) }))} disabled={currentPageSafe <= 1}>
               Previous
             </Button>
             <div className="flex items-center px-4 text-sm font-medium text-slate-700">
               {currentPageSafe} / {totalPages}
             </div>
-            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPageSafe >= totalPages}>
+            <Button variant="outline" size="sm" onClick={() => setDirectoryState((current) => ({ ...current, currentPage: Math.min(totalPages, current.currentPage + 1) }))} disabled={currentPageSafe >= totalPages}>
               Next
             </Button>
           </div>
@@ -480,6 +523,12 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      <ConfirmModal 
+        isOpen={!!confirmConfig} 
+        onClose={() => setConfirmConfig(null)} 
+        {...confirmConfig} 
+      />
     </motion.div>
   );
 }

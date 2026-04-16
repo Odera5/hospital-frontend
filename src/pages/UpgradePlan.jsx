@@ -1,59 +1,238 @@
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Check, X, Zap, Crown, Sparkles, MessageSquare, Briefcase, FileUp, BookOpen } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Check, X, Crown, FileUp, BookOpen } from "lucide-react";
 import api from "../services/api";
 import Toast from "../components/Toast";
 import Button from "../components/ui/Button";
+import ConfirmModal from "../components/ui/ConfirmModal";
+
+const ACTIVE_PAYSTACK_STATUSES = ["active", "attention"];
 
 export default function UpgradePlan() {
   const [patientCount, setPatientCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [manageLoading, setManageLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [billingInfo, setBillingInfo] = useState(null);
   const [toast, setToast] = useState(null);
+  const [confirmConfig, setConfirmConfig] = useState(null);
 
-  const storedUser = JSON.parse(localStorage.getItem("user") || sessionStorage.getItem("user")) || {};
-  const currentPlan = storedUser?.clinic?.plan || "FREE";
+  const storedUser =
+    JSON.parse(localStorage.getItem("user") || sessionStorage.getItem("user")) || {};
+  const currentPlan = billingInfo?.plan || storedUser?.clinic?.plan || "FREE";
+  const subscriptionEnds =
+    billingInfo?.subscriptionEnds || storedUser?.clinic?.subscriptionEnds || null;
+  const paystackSubscriptionStatus =
+    billingInfo?.paystackSubscriptionStatus ||
+    storedUser?.clinic?.paystackSubscriptionStatus ||
+    null;
+  const paystackNextPaymentDate =
+    billingInfo?.paystackNextPaymentDate ||
+    storedUser?.clinic?.paystackNextPaymentDate ||
+    null;
 
   useEffect(() => {
-    const loadUsage = async () => {
+    const loadUsageAndBilling = async () => {
       try {
         setLoading(true);
-        const res = await api.get("/patients");
-        const activePatients = (res.data || []).filter((p) => !p.isDeleted);
+        const [patientsResponse, billingResponse] = await Promise.all([
+          api.get("/patients"),
+          api.get("/billing"),
+        ]);
+
+        const activePatients = (patientsResponse.data || []).filter(
+          (patient) => !patient.isDeleted,
+        );
+
         setPatientCount(activePatients.length);
-      } catch (err) {
-        console.error("Failed to load patient count", err);
+        setBillingInfo(billingResponse.data?.clinic || null);
+      } catch (error) {
+        console.error("Failed to load billing page data", error);
       } finally {
         setLoading(false);
       }
     };
-    loadUsage();
+
+    loadUsageAndBilling();
   }, []);
 
-  const handleUpgradeClick = () => {
-    setToast({ message: "Stripe Billing Integration is coming in the next phase! 🚀", type: "success" });
+  const handleUpgradeClick = async () => {
+    try {
+      setCheckoutLoading(true);
+      const response = await api.post("/billing/paystack/initialize");
+      const authorizationUrl = response.data?.authorizationUrl;
+
+      if (!authorizationUrl) {
+        throw new Error("Paystack did not return a checkout URL.");
+      }
+
+      window.location.href = authorizationUrl;
+    } catch (error) {
+      setToast({
+        message:
+          error.response?.data?.message ||
+          error.message ||
+          "We could not start Paystack checkout.",
+        type: "error",
+      });
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   const usagePercent = Math.min((patientCount / 100) * 100, 100);
+  const isPro = currentPlan === "PRO";
+  const hasActivePaidSubscription = ACTIVE_PAYSTACK_STATUSES.includes(
+    String(paystackSubscriptionStatus || "").toLowerCase(),
+  );
+  const formattedRenewalDate = subscriptionEnds
+    ? new Date(subscriptionEnds).toLocaleDateString("en-NG", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
+  const formattedNextPaymentDate = paystackNextPaymentDate
+    ? new Date(paystackNextPaymentDate).toLocaleDateString("en-NG", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
+
+  const syncStoredUserClinic = (clinicPatch) => {
+    [localStorage, sessionStorage].forEach((storage) => {
+      const rawUser = storage.getItem("user");
+      if (!rawUser) {
+        return;
+      }
+
+      try {
+        const parsedUser = JSON.parse(rawUser);
+        storage.setItem(
+          "user",
+          JSON.stringify({
+            ...parsedUser,
+            clinic: {
+              ...(parsedUser.clinic || {}),
+              ...clinicPatch,
+            },
+          }),
+        );
+      } catch {
+        // ignore invalid stored state
+      }
+    });
+  };
+
+  const handleManageBilling = async () => {
+    try {
+      setManageLoading(true);
+      const response = await api.get("/billing/paystack/manage-link");
+      const link = response.data?.link;
+
+      if (!link) {
+        throw new Error("Paystack did not return a management link.");
+      }
+
+      window.location.href = link;
+    } catch (error) {
+      setToast({
+        message:
+          error.response?.data?.message ||
+          error.message ||
+          "We could not open Paystack management right now.",
+        type: "error",
+      });
+    } finally {
+      setManageLoading(false);
+    }
+  };
+
+  const executeCancelAutoRenew = async () => {
+
+    try {
+      setCancelLoading(true);
+      const response = await api.post("/billing/paystack/cancel");
+      const clinic = response.data?.clinic || null;
+      if (clinic) {
+        setBillingInfo(clinic);
+        syncStoredUserClinic(clinic);
+      }
+      setToast({
+        message:
+          response.data?.message ||
+          "Auto-renew has been disabled successfully.",
+        type: "success",
+      });
+    } catch (error) {
+      setToast({
+        message:
+          error.response?.data?.message ||
+          error.message ||
+          "We could not disable auto-renew.",
+        type: "error",
+      });
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
+  const handleCancelAutoRenew = () => {
+    setConfirmConfig({
+      title: "Disable Auto-Renew",
+      message: "Disable auto-renew for this clinic's Paystack subscription? The clinic will keep Pro access until the current paid period ends.",
+      confirmText: "Yes, Disable",
+      danger: true,
+      onConfirm: executeCancelAutoRenew
+    });
+  };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="w-full max-w-6xl mx-auto p-6 md:p-8 min-h-full">
-      {toast && <Toast message={toast.message} type={toast.type} duration={4000} onClose={() => setToast(null)} />}
+    <div className="w-full max-w-6xl mx-auto p-6 md:p-8 min-h-full">
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={4000}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      <ConfirmModal 
+        isOpen={!!confirmConfig} 
+        onClose={() => setConfirmConfig(null)} 
+        {...confirmConfig} 
+      />
 
       <div className="text-center mb-12">
         <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-4">
-          Upgrade your Clinic's Potential
+          Upgrade your Clinic&apos;s Potential
         </h1>
         <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-          Scale your practice with unlimited patients, automated reminders, and advanced analytics designed to grow your revenue.
+          Scale your practice with unlimited patients, automated reminders, and
+          advanced analytics designed to grow your revenue.
         </p>
+        {hasActivePaidSubscription && (
+          <p className="mt-4 text-sm inline-flex items-center gap-2 font-medium text-emerald-700 bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-100 shadow-sm">
+            <Crown size={16} /> Pro Plan Active — Next payment: {formattedNextPaymentDate || formattedRenewalDate}
+          </p>
+        )}
       </div>
 
-      {currentPlan === "FREE" && (
+      {!isPro && (
         <div className="mb-12 max-w-3xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-surface-200">
           <div className="flex justify-between items-end mb-2">
             <div>
-               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Free Plan Usage</h3>
-               <p className="text-2xl font-bold text-slate-800">{patientCount} <span className="text-lg font-medium text-slate-400">/ 100 Patients</span></p>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+                Free Plan Usage
+              </h3>
+              <p className="text-2xl font-bold text-slate-800">
+                {patientCount}{" "}
+                <span className="text-lg font-medium text-slate-400">
+                  / 100 Patients
+                </span>
+              </p>
             </div>
             {patientCount >= 100 ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-100 text-red-700 font-bold text-sm rounded-full">
@@ -66,8 +245,10 @@ export default function UpgradePlan() {
             )}
           </div>
           <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden mt-4">
-            <div 
-              className={`h-full rounded-full transition-all duration-1000 ${patientCount >= 100 ? 'bg-red-500' : 'bg-primary-500'}`}
+            <div
+              className={`h-full rounded-full transition-all duration-1000 ${
+                patientCount >= 100 ? "bg-red-500" : "bg-primary-500"
+              }`}
               style={{ width: `${loading ? 0 : usagePercent}%` }}
             />
           </div>
@@ -75,105 +256,159 @@ export default function UpgradePlan() {
       )}
 
       <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-        {/* Free Plan */}
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow relative">
-           {currentPlan === "FREE" && (
-             <div className="absolute top-0 right-8 transform -translate-y-1/2">
-                <span className="bg-slate-800 text-white text-xs font-bold uppercase tracking-widest py-1 px-3 rounded-full shadow-sm">Current Plan</span>
-             </div>
-           )}
-           <div className="mb-6">
-             <h3 className="text-2xl font-bold text-slate-900 mb-2">Starter</h3>
-             <p className="text-slate-500 text-sm">Perfect for solo practitioners just starting out.</p>
-           </div>
-           
-           <div className="mb-8">
-             <span className="text-5xl font-extrabold text-slate-900">Free</span>
-             <span className="text-slate-500 font-medium"> / forever</span>
-           </div>
+          {!isPro && (
+            <div className="absolute top-0 right-8 transform -translate-y-1/2">
+              <span className="bg-slate-800 text-white text-xs font-bold uppercase tracking-widest py-1 px-3 rounded-full shadow-sm">
+                Current Plan
+              </span>
+            </div>
+          )}
+          <div className="mb-6">
+            <h3 className="text-2xl font-bold text-slate-900 mb-2">Starter</h3>
+            <p className="text-slate-500 text-sm">
+              Perfect for solo practitioners just starting out.
+            </p>
+          </div>
 
-           <Button variant="outline" className="w-full mb-8 py-6 text-lg border-slate-300 font-semibold" disabled>
-             {currentPlan === "FREE" ? "Active" : "Downgrade"}
-           </Button>
+          <div className="mb-8">
+            <span className="text-5xl font-extrabold text-slate-900">Free</span>
+            <span className="text-slate-500 font-medium"> / forever</span>
+          </div>
 
-           <div className="space-y-4 flex-1">
-             <FeatureItem included>Up to 100 Patients</FeatureItem>
-             <FeatureItem included>2 Staff Accounts</FeatureItem>
-             <FeatureItem included>Manual Appointments</FeatureItem>
-             <FeatureItem included>Basic Clinical Records</FeatureItem>
-             <FeatureItem missing>Unlimited Storage (X-Ray Uploads)</FeatureItem>
-             <FeatureItem missing>Advanced Analytics</FeatureItem>
-           </div>
+          <Button
+            variant="outline"
+            className="w-full mb-8 py-6 text-lg border-slate-300 font-semibold"
+            disabled
+          >
+            {isPro ? "Downgrade" : "Active"}
+          </Button>
+
+          <div className="space-y-4 flex-1">
+            <FeatureItem included>Up to 100 Patients</FeatureItem>
+            <FeatureItem included>2 Staff Accounts</FeatureItem>
+            <FeatureItem included>Manual Appointments</FeatureItem>
+            <FeatureItem included>Basic Clinical Records</FeatureItem>
+            <FeatureItem missing>Unlimited Storage (X-Ray Uploads)</FeatureItem>
+            <FeatureItem missing>Advanced Analytics</FeatureItem>
+          </div>
         </div>
 
-        {/* Pro Plan */}
         <div className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-3xl p-8 border border-slate-700 shadow-xl flex flex-col relative transform md:-translate-y-4">
-           {currentPlan === "PRO" && (
-             <div className="absolute top-0 right-8 transform -translate-y-1/2">
-                <span className="bg-primary-500 text-white text-xs font-bold uppercase tracking-widest py-1 px-3 rounded-full shadow-sm">Current Plan</span>
-             </div>
-           )}
-           <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
-              <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-sm font-bold uppercase tracking-widest py-1.5 px-4 rounded-full shadow-lg flex items-center gap-1.5">
-                 <Crown size={16} /> Recommended
+          {isPro && (
+            <div className="absolute top-0 right-8 transform -translate-y-1/2">
+              <span className="bg-primary-500 text-white text-xs font-bold uppercase tracking-widest py-1 px-3 rounded-full shadow-sm">
+                Current Plan
               </span>
-           </div>
+            </div>
+          )}
+          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+            <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-sm font-bold uppercase tracking-widest py-1.5 px-4 rounded-full shadow-lg flex items-center gap-1.5">
+              <Crown size={16} /> Recommended
+            </span>
+          </div>
 
-           <div className="mb-6 mt-4">
-             <h3 className="text-2xl font-bold text-white mb-2">Professional</h3>
-             <p className="text-slate-400 text-sm">For growing clinics that need scale and automation.</p>
-           </div>
-           
-           <div className="mb-8 flex items-end gap-1">
-             <span className="text-4xl md:text-5xl font-extrabold text-white">NGN 12,000</span>
-             <span className="text-slate-400 font-medium mb-1"> / month</span>
-           </div>
+          <div className="mb-6 mt-4">
+            <h3 className="text-2xl font-bold text-white mb-2">Professional</h3>
+            <p className="text-slate-400 text-sm">
+              For growing clinics that need scale and automation.
+            </p>
+          </div>
 
-           <Button 
-             className="w-full py-6 text-lg font-bold bg-primary-500 hover:bg-primary-400 text-white shadow-[0_0_20px_rgba(14,165,233,0.3)] border-transparent" 
-             onClick={handleUpgradeClick}
-           >
-             {currentPlan === "PRO" ? "Manage Billing" : "Start 14-Day Free Trial"}
-           </Button>
-           
-           <div className="h-8 flex justify-center items-center mb-4">
-             {currentPlan !== "PRO" && (
-                <p className="text-slate-400 text-xs font-medium bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700">No credit card required initially.</p>
-             )}
-           </div>
+          <div className="mb-8 flex items-end gap-1">
+            <span className="text-4xl md:text-5xl font-extrabold text-white">
+              NGN 12,000
+            </span>
+            <span className="text-slate-400 font-medium mb-1"> / month</span>
+          </div>
 
-           <div className="space-y-4 flex-1">
-             <FeatureItem included dark highlight>Unlimited Patients</FeatureItem>
-             <FeatureItem included dark highlight>Unlimited Staff Accounts</FeatureItem>
-             <FeatureItem included dark highlight icon={<FileUp size={18} />}>Unlimited X-Ray & File Uploads</FeatureItem>
-             <FeatureItem included dark highlight icon={<BookOpen size={18} />}>1-Click Dental Formulary</FeatureItem>
-             <FeatureItem included dark highlight>Online Patient Intake Forms</FeatureItem>
-             <FeatureItem included dark>Everything in Starter</FeatureItem>
-             <FeatureItem included dark>Custom Invoice Branding</FeatureItem>
-             <FeatureItem included dark>Advanced Role-Based Access (RBAC)</FeatureItem>
-             <FeatureItem included dark>Priority 24/7 Support</FeatureItem>
-           </div>
+          <Button
+            className="w-full py-6 text-lg font-bold bg-primary-500 hover:bg-primary-400 text-white shadow-[0_0_20px_rgba(14,165,233,0.3)] border-transparent"
+            onClick={handleUpgradeClick}
+            isLoading={checkoutLoading}
+          >
+            {hasActivePaidSubscription ? "Update Payment Method" : "Subscribe to Pro Plan"}
+          </Button>
+
+          <div className="h-8 flex justify-center items-center mb-4">
+            {!isPro && (
+              <p className="text-slate-400 text-xs font-medium bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700">
+                Secure recurring billing with Paystack in NGN.
+              </p>
+            )}
+          </div>
+
+          {hasActivePaidSubscription && (
+            <div className="mb-6 space-y-3">
+              <Button
+                variant="outline"
+                className="w-full border-slate-600 bg-slate-800 text-white hover:bg-slate-700"
+                onClick={handleManageBilling}
+                isLoading={manageLoading}
+              >
+                Open Paystack Manage Page
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full border-red-500/40 bg-red-500/10 text-red-100 hover:bg-red-500/20"
+                onClick={handleCancelAutoRenew}
+                isLoading={cancelLoading}
+              >
+                Disable Auto-Renew
+              </Button>
+            </div>
+          )}
+
+          <div className="space-y-4 flex-1">
+            <FeatureItem included dark highlight>
+              Unlimited Patients
+            </FeatureItem>
+            <FeatureItem included dark highlight>
+              Unlimited Staff Accounts
+            </FeatureItem>
+            <FeatureItem included dark highlight icon={<FileUp size={18} />}>
+              Unlimited X-Ray &amp; File Uploads
+            </FeatureItem>
+            <FeatureItem included dark highlight icon={<BookOpen size={18} />}>
+              1-Click Dental Formulary
+            </FeatureItem>
+            <FeatureItem included dark highlight>
+              Online Patient Intake Forms
+            </FeatureItem>
+            <FeatureItem included dark>Everything in Starter</FeatureItem>
+            <FeatureItem included dark>Custom Invoice Branding</FeatureItem>
+            <FeatureItem included dark>
+              Advanced Role-Based Access (RBAC)
+            </FeatureItem>
+            <FeatureItem included dark>Priority 24/7 Support</FeatureItem>
+          </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
 function FeatureItem({ children, included, missing, dark, highlight, icon }) {
   return (
-    <div className={`flex items-center gap-3 ${missing ? 'opacity-50' : ''}`}>
-      <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
-        included 
-          ? highlight 
-             ? 'bg-amber-500/20 text-amber-400'
-             : dark ? 'bg-primary-500/20 text-primary-400' : 'bg-emerald-100 text-emerald-600' 
-          : 'bg-slate-100 text-slate-400'
-      }`}>
-        {included ? (icon || <Check size={14} strokeWidth={3} />) : <X size={14} strokeWidth={3} />}
+    <div className={`flex items-center gap-3 ${missing ? "opacity-50" : ""}`}>
+      <div
+        className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
+          included
+            ? highlight
+              ? "bg-amber-500/20 text-amber-400"
+              : dark
+                ? "bg-primary-500/20 text-primary-400"
+                : "bg-emerald-100 text-emerald-600"
+            : "bg-slate-100 text-slate-400"
+        }`}
+      >
+        {included ? icon || <Check size={14} strokeWidth={3} /> : <X size={14} strokeWidth={3} />}
       </div>
-      <span className={`text-sm font-medium ${
-        dark ? 'text-slate-200' : 'text-slate-700'
-      } ${highlight ? 'font-bold text-white' : ''}`}>
+      <span
+        className={`text-sm font-medium ${
+          dark ? "text-slate-200" : "text-slate-700"
+        } ${highlight ? "font-bold text-white" : ""}`}
+      >
         {children}
       </span>
     </div>

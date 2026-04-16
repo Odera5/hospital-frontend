@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { UserPlus, Users, Mail, Shield, ShieldAlert, Key, Link as LinkIcon, Trash2, Power, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -7,24 +7,44 @@ import { Card, CardContent } from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Toast from "../components/Toast";
+import ConfirmModal from "../components/ui/ConfirmModal";
+import usePersistentState from "../hooks/usePersistentState";
+
+const initialSignupDraft = {
+  name: "",
+  email: "",
+  password: "",
+  role: "nurse",
+};
 
 const supportEmail = "primuxcare@gmail.com";
-const whatsappNumber = "08068073362";
 const whatsappLink = "https://wa.me/2348068073362";
 
 export default function Signup() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const MotionDiv = motion.div;
+  const MotionTr = motion.tr;
+  const [signupDraft, setSignupDraft, clearSignupDraft] = usePersistentState(
+    "primuxcare:draft:signup",
+    initialSignupDraft,
+  );
+  const { name, email, password, role } = signupDraft;
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState("nurse");
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(false);
   const [staffLoading, setStaffLoading] = useState(true);
   const [busyStaffId, setBusyStaffId] = useState("");
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
+  const [confirmConfig, setConfirmConfig] = useState(null);
   const navigate = useNavigate();
   const currentUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user")) || "null");
+
+  const showToast = (message, type = "success") => setToast({ show: true, message, type });
+
+  const fetchStaff = useCallback(async () => {
+    try { setStaffLoading(true); const response = await api.get("/auth/staff"); setStaff(response.data || []); } 
+    catch (err) { showToast(err.response?.data?.message || "Failed to load staff accounts", "error"); } 
+    finally { setStaffLoading(false); }
+  }, []);
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== "admin") {
@@ -32,17 +52,13 @@ export default function Signup() {
       return;
     }
     fetchStaff();
-  }, [navigate, currentUser?.role]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.role, fetchStaff, navigate]);
 
-  const showToast = (message, type = "success") => setToast({ show: true, message, type });
+  const updateSignupDraft = (patch) =>
+    setSignupDraft((current) => ({ ...current, ...patch }));
 
-  const fetchStaff = async () => {
-    try { setStaffLoading(true); const response = await api.get("/auth/staff"); setStaff(response.data || []); } 
-    catch (err) { showToast(err.response?.data?.message || "Failed to load staff accounts", "error"); } 
-    finally { setStaffLoading(false); }
-  };
-
-  const resetForm = () => { setName(""); setEmail(""); setPassword(""); setRole("nurse"); };
+  const resetForm = () => { clearSignupDraft(); };
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -68,8 +84,7 @@ export default function Signup() {
     finally { setBusyStaffId(""); }
   };
 
-  const handleDelete = async (staffMember) => {
-    if (!window.confirm(`Delete ${staffMember.name}'s account permanently?`)) return;
+  const executeDelete = async (staffMember) => {
     try {
       setBusyStaffId(staffMember.id);
       const response = await api.delete(`/auth/staff/${staffMember.id}`);
@@ -79,8 +94,18 @@ export default function Signup() {
     finally { setBusyStaffId(""); }
   };
 
+  const handleDelete = (staffMember) => {
+    setConfirmConfig({
+      title: "Delete Staff Account",
+      message: `Are you sure you want to permanently delete ${staffMember.name}'s account? They will immediately lose access to the platform.`,
+      confirmText: "Delete Account",
+      danger: true,
+      onConfirm: () => executeDelete(staffMember)
+    });
+  };
+
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
+    <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-surface-200">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 mb-2">Staff Directory & Access</h2>
@@ -97,14 +122,14 @@ export default function Signup() {
             <CardContent className="p-6">
               <h3 className="font-bold text-lg mb-6 flex items-center text-slate-900"><UserPlus size={18} className="mr-2 text-primary-500" /> Provision Account</h3>
               <form onSubmit={handleSignup} className="space-y-4">
-                <Input label="Full Name *" value={name} onChange={(e) => setName(e.target.value)} icon={UserPlus} className="bg-slate-50" />
-                <Input label="Email Address *" type="email" value={email} onChange={(e) => setEmail(e.target.value)} icon={Mail} className="bg-slate-50" />
+                <Input label="Full Name *" value={name} onChange={(e) => updateSignupDraft({ name: e.target.value })} icon={UserPlus} className="bg-slate-50" />
+                <Input label="Email Address *" type="email" value={email} onChange={(e) => updateSignupDraft({ email: e.target.value })} icon={Mail} className="bg-slate-50" />
                 
                 <div className="space-y-1.5">
                    <label className="text-sm font-medium text-slate-700">Password *</label>
                    <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Key size={18} className="text-slate-400" /></div>
-                      <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-xl border border-slate-200 pl-10 pr-12 py-3 bg-slate-50 text-sm focus:ring-primary-500 shadow-sm h-[46px]" />
+                      <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => updateSignupDraft({ password: e.target.value })} className="w-full rounded-xl border border-slate-200 pl-10 pr-12 py-3 bg-slate-50 text-sm focus:ring-primary-500 shadow-sm h-[46px]" />
                       <button type="button" onClick={() => setShowPassword(p => !p)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 font-medium text-xs uppercase tracking-wider">{showPassword ? "Hide" : "Show"}</button>
                    </div>
                 </div>
@@ -113,7 +138,7 @@ export default function Signup() {
                    <label className="text-sm font-medium text-slate-700">Account Role *</label>
                    <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Shield size={18} className="text-slate-400" /></div>
-                      <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-3 bg-slate-50 text-sm focus:ring-primary-500 shadow-sm appearance-none h-[46px] capitalize">
+                      <select value={role} onChange={(e) => updateSignupDraft({ role: e.target.value })} className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-3 bg-slate-50 text-sm focus:ring-primary-500 shadow-sm appearance-none h-[46px] capitalize">
                         <option value="nurse">Nurse / Front Desk</option>
                         <option value="doctor">Doctor</option>
                         <option value="admin">Administrator</option>
@@ -165,7 +190,7 @@ export default function Signup() {
                          const isBusy = busyStaffId === member.id;
                          
                          return (
-                           <motion.tr key={member.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={`hover:bg-slate-50/50 transition-colors ${!member.isActive ? "bg-slate-50/80" : "bg-white"}`}>
+                           <MotionTr key={member.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={`hover:bg-slate-50/50 transition-colors ${!member.isActive ? "bg-slate-50/80" : "bg-white"}`}>
                              <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
                                    <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 font-bold uppercase tracking-wider ${isCurrentUser ? "bg-primary-100 text-primary-700 border border-primary-200" : "bg-slate-100 text-slate-600 border border-slate-200"}`}>
@@ -200,7 +225,7 @@ export default function Signup() {
                                   </Button>
                                 </div>
                              </td>
-                           </motion.tr>
+                           </MotionTr>
                          );
                        })}
                      </AnimatePresence>
@@ -213,6 +238,11 @@ export default function Signup() {
       </div>
 
       {toast.show && <Toast message={toast.message} type={toast.type} duration={3000} onClose={() => setToast({ ...toast, show: false })} />}
-    </motion.div>
+      <ConfirmModal 
+        isOpen={!!confirmConfig} 
+        onClose={() => setConfirmConfig(null)} 
+        {...confirmConfig} 
+      />
+    </MotionDiv>
   );
 }

@@ -192,7 +192,7 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
       // Parse current attachments (handles stringified JSON if it came from DB as string)
       let currentAttachments = [];
       if (typeof recordData.attachments === 'string') {
-        try { currentAttachments = JSON.parse(recordData.attachments); } catch(e) {}
+        try { currentAttachments = JSON.parse(recordData.attachments); } catch { currentAttachments = []; }
       } else if (Array.isArray(recordData.attachments)) {
         currentAttachments = recordData.attachments;
       }
@@ -213,7 +213,7 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
   const removeAttachment = (index) => {
     let currentAttachments = Array.isArray(recordData.attachments) ? [...recordData.attachments] : [];
     if (typeof recordData.attachments === 'string') {
-        try { currentAttachments = JSON.parse(recordData.attachments); } catch(e) {}
+        try { currentAttachments = JSON.parse(recordData.attachments); } catch { currentAttachments = []; }
     }
     currentAttachments.splice(index, 1);
     setRecordData({ ...recordData, attachments: currentAttachments });
@@ -443,7 +443,7 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
         {(() => {
           let atts = [];
           if (Array.isArray(recordData.attachments)) atts = recordData.attachments;
-          else if (typeof recordData.attachments === 'string') { try { atts = JSON.parse(recordData.attachments); } catch(e) {} }
+          else if (typeof recordData.attachments === 'string') { try { atts = JSON.parse(recordData.attachments); } catch { atts = []; } }
           
           if (atts.length === 0) {
             return <p className="text-sm text-slate-400 italic text-center py-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">No attachments. Upload X-Rays, Lab Results, or Photos.</p>;

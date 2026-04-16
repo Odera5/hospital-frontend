@@ -8,16 +8,22 @@ import { getEntityId } from "../../utils/entityId";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
 import { Card, CardContent } from "../ui/Card";
+import ConfirmModal from "../ui/ConfirmModal";
+import usePersistentState from "../../hooks/usePersistentState";
 
 export default function AppointmentSchedule({ patientId = null }) {
   const storedUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user"))) || {};
   const canCompleteAppointment = storedUser.role === "admin" || storedUser.role === "doctor" || storedUser.role === "nurse";
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [uiState, setUiState, clearUiState] = usePersistentState(
+    `primuxcare:draft:appointment-schedule:${patientId || "general"}`,
+    { showForm: false, editingAppointmentId: null, selectedDate: "" },
+  );
+  const { showForm, editingAppointmentId, selectedDate } = uiState;
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
-  const [selectedDate, setSelectedDate] = useState("");
+  const [confirmConfig, setConfirmConfig] = useState(null);
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -41,8 +47,19 @@ export default function AppointmentSchedule({ patientId = null }) {
 
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Cancel this appointment?")) return;
+  useEffect(() => {
+    if (!editingAppointmentId) {
+      setEditingAppointment(null);
+      return;
+    }
+
+    const matchedAppointment = appointments.find(
+      (item) => getEntityId(item) === editingAppointmentId,
+    );
+    setEditingAppointment(matchedAppointment || null);
+  }, [appointments, editingAppointmentId]);
+
+  const executeDelete = async (id) => {
     try {
       await api.delete(`/appointments/${id}`);
       setToast({ show: true, message: "Appointment cancelled", type: "success" });
@@ -50,6 +67,16 @@ export default function AppointmentSchedule({ patientId = null }) {
     } catch (error) {
       setToast({ show: true, message: error.response?.data?.message || "Failed to cancel", type: "error" });
     }
+  };
+
+  const handleDelete = (id) => {
+    setConfirmConfig({
+      title: "Cancel Appointment",
+      message: "Are you sure you want to cancel this appointment?",
+      confirmText: "Cancel Appointment",
+      danger: true,
+      onConfirm: () => executeDelete(id)
+    });
   };
 
   const handleComplete = async (id) => {
@@ -63,7 +90,7 @@ export default function AppointmentSchedule({ patientId = null }) {
   };
 
   const handleFormSuccess = () => {
-    setShowForm(false);
+    clearUiState();
     setEditingAppointment(null);
     fetchAppointments();
     setToast({ show: true, message: editingAppointment ? "Appointment updated" : "Appointment scheduled", type: "success" });
@@ -91,7 +118,7 @@ export default function AppointmentSchedule({ patientId = null }) {
   const canModifyAppointment = (status) => !["arrived", "completed", "cancelled", "no_show"].includes(status);
 
   if (showForm) {
-    return <AppointmentForm patientId={patientId} appointment={editingAppointment} onSuccess={handleFormSuccess} onCancel={() => { setShowForm(false); setEditingAppointment(null); }} />;
+    return <AppointmentForm patientId={patientId} appointment={editingAppointment} draftStorageKey={`primuxcare:draft:appointment-form:${editingAppointmentId || patientId || "new"}`} onSuccess={handleFormSuccess} onCancel={() => { clearUiState(); setEditingAppointment(null); }} />;
   }
 
   return (
@@ -103,17 +130,17 @@ export default function AppointmentSchedule({ patientId = null }) {
              Upcoming schedule. Appointments disappear from this view once the patient is marked as completed or checked in to the waiting room.
           </p>
         </div>
-        <Button onClick={() => { setEditingAppointment(null); setShowForm(true); }} className="w-full sm:w-auto shadow-md">
+        <Button onClick={() => { setEditingAppointment(null); setUiState((current) => ({ ...current, showForm: true, editingAppointmentId: null })); }} className="w-full sm:w-auto shadow-md">
           <Plus size={18} className="mr-2" /> Schedule Visit
         </Button>
       </div>
 
       <div className="flex flex-wrap gap-4 items-center">
         <div className="w-full sm:w-72">
-          <Input type="date" label="Filter by Date" icon={CalendarIcon} value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-white" />
+          <Input type="date" label="Filter by Date" icon={CalendarIcon} value={selectedDate} onChange={(e) => setUiState((current) => ({ ...current, selectedDate: e.target.value }))} className="bg-white" />
         </div>
         {selectedDate && (
-          <Button variant="ghost" size="sm" onClick={() => setSelectedDate("")} className="mt-6 text-slate-500 hover:bg-slate-200">
+          <Button variant="ghost" size="sm" onClick={() => setUiState((current) => ({ ...current, selectedDate: "" }))} className="mt-6 text-slate-500 hover:bg-slate-200">
              Clear Date Filter
           </Button>
         )}
@@ -174,7 +201,7 @@ export default function AppointmentSchedule({ patientId = null }) {
                     <div className="flex items-center gap-2 pt-4 mt-2 border-t border-slate-100 lg:opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                       {canModifyAppointment(apt.status) ? (
                         <>
-                          <Button variant="ghost" size="sm" onClick={() => { setEditingAppointment(apt); setShowForm(true); }} className="flex-1 text-slate-600 hover:text-blue-600 px-0">
+                          <Button variant="ghost" size="sm" onClick={() => { setEditingAppointment(apt); setUiState((current) => ({ ...current, showForm: true, editingAppointmentId: getEntityId(apt) })); }} className="flex-1 text-slate-600 hover:text-blue-600 px-0">
                             <Edit2 size={16} />
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => handleDelete(getEntityId(apt))} className="flex-1 text-slate-600 hover:text-red-600 hover:bg-red-50 px-0">
@@ -201,6 +228,11 @@ export default function AppointmentSchedule({ patientId = null }) {
       )}
 
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} duration={3000} />}
+      <ConfirmModal 
+        isOpen={!!confirmConfig} 
+        onClose={() => setConfirmConfig(null)} 
+        {...confirmConfig} 
+      />
     </div>
   );
 }

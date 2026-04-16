@@ -8,6 +8,7 @@ import { createEmptyRecord, formatToothFindings } from "./recordUtils";
 import { getEntityId } from "../../utils/entityId";
 import Button from "../ui/Button";
 import api from "../../services/api";
+import usePersistentState from "../../hooks/usePersistentState";
 
 function RecordSection({ title, content, icon: Icon, keyword }) {
   if (!content) return null;
@@ -20,16 +21,25 @@ function RecordSection({ title, content, icon: Icon, keyword }) {
 }
 
 function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelete, handleSaveEdit, searchKeyword, virtualizer, canManageRecords = false }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingRecordData, setEditingRecordData] = useState({ ...createEmptyRecord(), ...record });
-  const [loading, setLoading] = useState(false);
-
   const recordId = getEntityId(record);
+  const [isEditing, setIsEditing, clearEditingFlag] = usePersistentState(
+    `primuxcare:draft:record-edit-open:${recordId}`,
+    false,
+  );
+  const [editingRecordData, setEditingRecordData, clearEditingDraft] = usePersistentState(
+    `primuxcare:draft:record-edit:${recordId}`,
+    { ...createEmptyRecord(), ...record },
+  );
+  const [loading, setLoading] = useState(false);
   const isExpanded = expandedRecordId === recordId;
 
   useEffect(() => { if (virtualizer) virtualizer.measure(); }, [isExpanded, virtualizer]);
 
-  const cancelEditing = useCallback(() => { setIsEditing(false); setEditingRecordData({ ...createEmptyRecord(), ...record }); setLoading(false); }, [record]);
+  const cancelEditing = useCallback(() => {
+    clearEditingFlag();
+    clearEditingDraft();
+    setLoading(false);
+  }, [clearEditingDraft, clearEditingFlag]);
 
   const saveEdit = async (e) => {
     e.preventDefault();
@@ -122,7 +132,7 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
               {(() => {
                  let atts = [];
                  if (Array.isArray(record.attachments)) atts = record.attachments;
-                 else if (typeof record.attachments === 'string') { try { atts = JSON.parse(record.attachments); } catch(e) {} }
+                 else if (typeof record.attachments === 'string') { try { atts = JSON.parse(record.attachments); } catch { atts = []; } }
                  
                  if (atts.length > 0) {
                    return (

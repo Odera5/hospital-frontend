@@ -8,6 +8,8 @@ import { getEntityId } from "../../utils/entityId";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
 import { Card, CardContent } from "../ui/Card";
+import ConfirmModal from "../ui/ConfirmModal";
+import usePersistentState from "../../hooks/usePersistentState";
 
 const STATUS_LABELS = { waiting: "Waiting", called: "Called", in_consultation: "In Consultation", completed: "Completed" };
 const NEXT_ACTION = { waiting: "called", called: "in_consultation", in_consultation: "completed" };
@@ -33,16 +35,37 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
   const isFrontDesk = storedUser.role === "nurse";
   const [entries, setEntries] = useState([]);
   const [patients, setPatients] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [patientSearchQuery, setPatientSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedPatient, setSelectedPatient] = useState("");
-  const [patientPickerOpen, setPatientPickerOpen] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [draft, setDraft, clearDraft] = usePersistentState(
+    "primuxcare:draft:waiting-room",
+    {
+      searchQuery: "",
+      patientSearchQuery: "",
+      statusFilter: "all",
+      selectedPatient: "",
+      patientPickerOpen: false,
+      notes: "",
+    },
+  );
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
+  const [confirmConfig, setConfirmConfig] = useState(null);
+  const {
+    searchQuery,
+    patientSearchQuery,
+    statusFilter,
+    selectedPatient,
+    patientPickerOpen,
+    notes,
+  } = draft;
 
-  useEffect(() => { if (preselectPatientId) setSelectedPatient(preselectPatientId); }, [preselectPatientId]);
+  const updateDraft = (patch) =>
+    setDraft((current) => ({ ...current, ...patch }));
+
+  useEffect(() => {
+    if (preselectPatientId) {
+      setDraft((current) => ({ ...current, selectedPatient: preselectPatientId }));
+    }
+  }, [preselectPatientId, setDraft]);
 
   const fetchPatients = useCallback(async () => {
     try {
@@ -81,10 +104,7 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
     if (!selectedPatient) return showToast("Select a patient to add", "error");
     try {
       await api.post("/waiting-room", { patientId: selectedPatient, notes });
-      setSelectedPatient("");
-      setPatientSearchQuery("");
-      setPatientPickerOpen(false);
-      setNotes("");
+      clearDraft();
       showToast("Patient added to waiting room", "success");
       fetchQueue();
     } catch (error) {
@@ -111,8 +131,7 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
     }
   };
 
-  const handleRemove = async (item) => {
-    if (!window.confirm(`Remove ${item.patientName || item.patientId?.name} from the queue?`)) return;
+  const executeRemove = async (item) => {
     try {
       await api.delete(`/waiting-room/${getEntityId(item)}`);
       showToast("Patient removed from waiting list", "success");
@@ -120,6 +139,16 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
     } catch (error) {
       showToast(error.response?.data?.message || "Failed to remove patient", "error");
     }
+  };
+
+  const handleRemove = (item) => {
+    setConfirmConfig({
+      title: "Remove from Queue",
+      message: `Are you sure you want to remove ${item.patientName || item.patientId?.name} from the waiting list?`,
+      confirmText: "Remove",
+      danger: true,
+      onConfirm: () => executeRemove(item)
+    });
   };
 
   const sectionItems = (status) => entries.filter((entry) => entry.status === status);
@@ -195,7 +224,7 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
               <div className="relative">
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Select Patient</label>
                 <div
-                  onClick={() => setPatientPickerOpen(!patientPickerOpen)}
+                  onClick={() => updateDraft({ patientPickerOpen: !patientPickerOpen })}
                   className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 cursor-pointer hover:border-slate-300 transition-colors"
                 >
                   <span className={selectedPatientDetails ? "text-slate-900 font-medium" : "text-slate-400"}>
@@ -208,7 +237,7 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
                   {patientPickerOpen && (
                     <div className="absolute z-30 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden">
                       <div className="border-b border-slate-100 p-2">
-                        <Input autoFocus value={patientSearchQuery} onChange={(e) => setPatientSearchQuery(e.target.value)} placeholder="Search name or card..." icon={Search} className="h-10 text-sm" />
+                        <Input autoFocus value={patientSearchQuery} onChange={(e) => updateDraft({ patientSearchQuery: e.target.value })} placeholder="Search name or card..." icon={Search} className="h-10 text-sm" />
                       </div>
                       <div className="max-h-60 overflow-y-auto p-1">
                         {filteredPatients.length === 0 ? (
@@ -217,7 +246,7 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
                           filteredPatients.map((p) => (
                             <button
                               key={getEntityId(p)} type="button"
-                              onClick={() => { setSelectedPatient(getEntityId(p)); setPatientPickerOpen(false); }}
+                              onClick={() => { updateDraft({ selectedPatient: getEntityId(p), patientPickerOpen: false }); }}
                               className={`w-full rounded-lg px-3 py-2.5 text-left transition-colors flex flex-col items-start ${selectedPatient === getEntityId(p) ? "bg-primary-50 pl-4 border-l-2 border-primary-500" : "hover:bg-slate-50 pl-4"}`}
                             >
                               <span className="font-semibold text-slate-900 text-sm">{p.name}</span>
@@ -234,7 +263,7 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-700">Triage Notes</label>
                 <textarea
-                  value={notes} onChange={(e) => setNotes(e.target.value)}
+                  value={notes} onChange={(e) => updateDraft({ notes: e.target.value })}
                   className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm resize-none"
                   rows="3" placeholder="Symptoms, priority..."
                 />
@@ -249,11 +278,11 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
 
         <div className="lg:col-span-2 space-y-6">
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full sm:w-auto rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 focus:outline-none shadow-sm">
+            <select value={statusFilter} onChange={(e) => updateDraft({ statusFilter: e.target.value })} className="w-full sm:w-auto rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 focus:outline-none shadow-sm">
               <option value="all">All Statuses</option>
               {Object.entries(STATUS_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
             </select>
-            <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search queue..." icon={Search} className="bg-white rounded-full shadow-sm" />
+            <Input value={searchQuery} onChange={(e) => updateDraft({ searchQuery: e.target.value })} placeholder="Search queue..." icon={Search} className="bg-white rounded-full shadow-sm" />
           </div>
 
           {loading ? (
@@ -321,6 +350,11 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
         </div>
       </div>
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} duration={3000} />}
+      <ConfirmModal 
+        isOpen={!!confirmConfig} 
+        onClose={() => setConfirmConfig(null)} 
+        {...confirmConfig} 
+      />
     </div>
   );
 }

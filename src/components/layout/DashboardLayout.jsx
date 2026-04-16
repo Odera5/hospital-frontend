@@ -9,13 +9,57 @@ import { logoutCurrentUser } from "../../services/api";
 import api from "../../services/api";
 import Button from "../ui/Button";
 
+const ACTIVE_PAYSTACK_STATUSES = ["active", "attention"];
+
+function NavItem({
+  icon: Icon,
+  label,
+  path,
+  danger,
+  badge,
+  location,
+  onNavigate,
+}) {
+  const NavIcon = Icon;
+  const active =
+    location.pathname === path.split("?")[0] &&
+    (path.includes("tab=trash")
+      ? location.search.includes("tab=trash")
+      : !location.search.includes("tab=trash"));
+
+  return (
+    <button
+      onClick={() => onNavigate(path)}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 mt-1 font-medium ${
+        active && !danger
+          ? "bg-primary-50 text-primary-700 shadow-sm"
+          : danger
+            ? "text-red-600 hover:bg-red-50 hover:text-red-700"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+      }`}
+    >
+      <NavIcon size={20} className={active && !danger ? "text-primary-600" : ""} />
+      {label}
+      {badge !== undefined && badge > 0 && (
+        <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center justify-center min-w-[20px] shadow-sm">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default function DashboardLayout() {
+  const MotionDiv = motion.div;
+  const MotionAside = motion.aside;
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [appointmentCount, setAppointmentCount] = useState(0);
   const [waitingCount, setWaitingCount] = useState(0);
+  const [showTrialBanner, setShowTrialBanner] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   const storedUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user"))) || {};
   const user = {
@@ -26,14 +70,44 @@ export default function DashboardLayout() {
   
   const clinicPlan = storedUser.clinic?.plan || "FREE";
   const subscriptionEnds = storedUser.clinic?.subscriptionEnds;
+  const paystackSubscriptionStatus = String(
+    storedUser.clinic?.paystackSubscriptionStatus || "",
+  ).toLowerCase();
+  const hasActivePaidSubscription = ACTIVE_PAYSTACK_STATUSES.includes(
+    paystackSubscriptionStatus,
+  );
   let remainingTrialDays = 0;
-  
+
   if (clinicPlan === "PRO" && subscriptionEnds) {
     const end = new Date(subscriptionEnds);
     const now = new Date();
-    remainingTrialDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+    remainingTrialDays = Math.max(
+      0,
+      Math.ceil((end - now) / (1000 * 60 * 60 * 24)),
+    );
   }
   
+  useEffect(() => {
+    if (clinicPlan !== "PRO" || hasActivePaidSubscription || remainingTrialDays <= 0) return;
+    
+    let hideTimer;
+    const showTimer = setTimeout(() => {
+      setShowTrialBanner(true);
+      
+      if (remainingTrialDays > 3) {
+        hideTimer = setTimeout(() => {
+          setShowTrialBanner(false);
+          setBannerDismissed(true);
+        }, 10000);
+      }
+    }, 2000);
+
+    return () => {
+      clearTimeout(showTimer);
+      if (hideTimer) clearTimeout(hideTimer);
+    };
+  }, [clinicPlan, remainingTrialDays, hasActivePaidSubscription]);
+
   const canViewRecords = ["admin", "doctor", "nurse"].includes(user.role);
 
   useEffect(() => {
@@ -46,7 +120,7 @@ export default function DashboardLayout() {
         const resWait = await api.get(`/waiting-room`);
         const activeWaiting = (resWait.data || []).filter(item => item.status === 'waiting' || item.status === 'called');
         setWaitingCount(activeWaiting.length);
-      } catch (err) {
+      } catch {
         // ignore for badges
       }
     };
@@ -66,29 +140,9 @@ export default function DashboardLayout() {
     navigate("/login");
   };
 
-  const NavItem = ({ icon: Icon, label, path, danger, badge }) => {
-    const active = location.pathname === path.split('?')[0] && (path.includes('tab=trash') ? location.search.includes('tab=trash') : !location.search.includes('tab=trash'));
-    
-    return (
-      <button
-        onClick={() => { navigate(path); setMobileMenuOpen(false); }}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 mt-1 font-medium ${
-          active && !danger
-            ? "bg-primary-50 text-primary-700 shadow-sm" 
-            : danger 
-              ? "text-red-600 hover:bg-red-50 hover:text-red-700" 
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-        }`}
-      >
-        <Icon size={20} className={active && !danger ? "text-primary-600" : ""} />
-        {label}
-        {badge !== undefined && badge > 0 && (
-          <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center justify-center min-w-[20px] shadow-sm">
-            {badge > 99 ? '99+' : badge}
-          </span>
-        )}
-      </button>
-    );
+  const handleNavClick = (path) => {
+    navigate(path);
+    setMobileMenuOpen(false);
   };
 
   // Determine header title based on pathname
@@ -109,7 +163,7 @@ export default function DashboardLayout() {
     <div className="flex h-screen bg-surface-50 font-sans overflow-hidden">
       <AnimatePresence>
         {mobileMenuOpen && (
-          <motion.div 
+          <MotionDiv
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
@@ -117,7 +171,7 @@ export default function DashboardLayout() {
         )}
       </AnimatePresence>
 
-      <motion.aside 
+      <MotionAside
         className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-surface-200 flex flex-col transition-transform duration-300 lg:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:relative lg:flex'}`}
       >
         <div className="flex items-center justify-between p-6 h-20 border-b border-surface-100 shrink-0">
@@ -138,14 +192,14 @@ export default function DashboardLayout() {
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           <div>
             <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Main Menu</p>
-            <NavItem icon={Home} label="Dashboard" path="/dashboard" />
+            <NavItem icon={Home} label="Dashboard" path="/dashboard" location={location} onNavigate={handleNavClick} />
             {canViewRecords && (
               <>
-                <NavItem icon={UserPlus} label="Register Patient" path="/register-patient" />
-                <NavItem icon={Calendar} label="Appointments" path="/appointments" badge={appointmentCount} />
-                <NavItem icon={Clock} label="Waiting Room" path="/waiting-room" badge={waitingCount} />
-                <NavItem icon={CreditCard} label="Billing" path="/billing" />
-                <NavItem icon={BarChart3} label="Reports" path="/reports" />
+                <NavItem icon={UserPlus} label="Register Patient" path="/register-patient" location={location} onNavigate={handleNavClick} />
+                <NavItem icon={Calendar} label="Appointments" path="/appointments" badge={appointmentCount} location={location} onNavigate={handleNavClick} />
+                <NavItem icon={Clock} label="Waiting Room" path="/waiting-room" badge={waitingCount} location={location} onNavigate={handleNavClick} />
+                <NavItem icon={CreditCard} label="Billing" path="/billing" location={location} onNavigate={handleNavClick} />
+                <NavItem icon={BarChart3} label="Reports" path="/reports" location={location} onNavigate={handleNavClick} />
               </>
             )}
           </div>
@@ -153,15 +207,15 @@ export default function DashboardLayout() {
           {user.role === "admin" && (
             <div>
               <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Administration</p>
-              <NavItem icon={Users} label="Manage Staff" path="/signup" />
-              <NavItem icon={Settings} label="Clinic Settings" path="/clinic-settings" />
-              <NavItem icon={Trash2} label="Trash" path="/dashboard?tab=trash" />
+              <NavItem icon={Users} label="Manage Staff" path="/signup" location={location} onNavigate={handleNavClick} />
+              <NavItem icon={Settings} label="Clinic Settings" path="/clinic-settings" location={location} onNavigate={handleNavClick} />
+              <NavItem icon={Trash2} label="Trash" path="/dashboard?tab=trash" location={location} onNavigate={handleNavClick} />
             </div>
           )}
 
           <div>
              <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">SaaS Plan</p>
-             <NavItem icon={Crown} label="Upgrade Plan" path="/upgrade" />
+             <NavItem icon={Crown} label="Upgrade Plan" path="/upgrade" location={location} onNavigate={handleNavClick} />
           </div>
         </div>
 
@@ -179,7 +233,7 @@ export default function DashboardLayout() {
             <LogOut size={18} className="mr-3" /> Sign Out
           </Button>
         </div>
-      </motion.aside>
+      </MotionAside>
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden bg-surface-50/50">
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-surface-200 flex items-center justify-between px-6 z-10 shrink-0 shadow-sm">
@@ -191,16 +245,57 @@ export default function DashboardLayout() {
               {headerTitle}
             </h1>
           </div>
-          <div className="flex items-center gap-4 text-sm font-medium text-slate-600 bg-white border border-surface-200 px-4 py-2 rounded-full shadow-sm">
-             <Clock size={16} className="text-primary-500 hidden sm:block" />
-             {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          <div className="flex items-center gap-3">
+             <div className="flex items-center gap-2 pl-4 text-sm font-medium text-slate-600 bg-white border border-surface-200 px-4 py-2 rounded-full shadow-sm">
+                <Clock size={16} className="text-primary-500 hidden sm:block" />
+                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+             </div>
           </div>
         </header>
 
-        {(clinicPlan === "PRO" && remainingTrialDays > 0) && (
-          <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2.5 text-center text-sm font-bold shadow-sm shrink-0 relative z-10 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
-            <span className="flex items-center gap-2"><Crown size={18} /> You have {remainingTrialDays} days left on your Free Pro Trial.</span>
-            <button onClick={() => navigate('/upgrade')} className="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-full text-xs transition-colors border border-white/30 backdrop-blur-sm shadow-sm">Upgrade Now</button>
+        <AnimatePresence>
+          {clinicPlan === "PRO" && remainingTrialDays > 0 && !hasActivePaidSubscription && showTrialBanner && (
+            <MotionDiv 
+              initial={{ height: 0, opacity: 0 }} 
+              animate={{ height: "auto", opacity: 1 }} 
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.6, ease: "easeInOut" }}
+              className={`text-white px-4 py-2.5 text-center text-sm font-bold shadow-sm shrink-0 relative z-10 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 overflow-hidden ${
+                remainingTrialDays <= 3 
+                  ? "bg-gradient-to-r from-red-600 to-rose-600" 
+                  : "bg-gradient-to-r from-amber-500 to-orange-500"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Crown size={18} /> 
+                {remainingTrialDays <= 3 ? "URGENT: " : ""}You have {remainingTrialDays} days left on your Free Pro Trial.
+              </span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => navigate('/upgrade')} className="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-full text-xs transition-colors border border-white/30 backdrop-blur-sm shadow-sm focus:outline-none">
+                  Upgrade Now
+                </button>
+                {remainingTrialDays > 3 && (
+                  <button onClick={() => { setShowTrialBanner(false); setBannerDismissed(true); }} className="bg-white/20 hover:bg-white/30 p-1.5 rounded-full text-xs transition-colors focus:outline-none ml-2" aria-label="Dismiss banner">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </MotionDiv>
+          )}
+        </AnimatePresence>
+
+        {clinicPlan === "PRO" && hasActivePaidSubscription && subscriptionEnds && (
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 py-2.5 text-center text-sm font-bold shadow-sm shrink-0 relative z-10 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+            <span className="flex items-center gap-2">
+              <Crown size={18} /> Paid Pro is active until{" "}
+              {new Date(subscriptionEnds).toLocaleDateString("en-NG", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+              .
+            </span>
+            <button onClick={() => navigate('/upgrade')} className="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-full text-xs transition-colors border border-white/30 backdrop-blur-sm shadow-sm">Manage Billing</button>
           </div>
         )}
 

@@ -1,6 +1,7 @@
 // src/components/ProtectedRoute.jsx
 import { Navigate } from "react-router-dom";
 import React from "react";
+import { readLastVisitedRoute } from "../utils/persistence";
 
 export default function ProtectedRoute({ children, allowedRoles = [] }) {
   const token = (localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken"));
@@ -13,12 +14,12 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
     (localStorage.removeItem("user"), sessionStorage.removeItem("user"));
   }
 
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token) return <Navigate to="/login" state={{ from: readLastVisitedRoute() }} replace />;
 
   if (!user) {
     (localStorage.removeItem("accessToken"), sessionStorage.removeItem("accessToken"));
     (localStorage.removeItem("refreshToken"), sessionStorage.removeItem("refreshToken"));
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: readLastVisitedRoute() }} replace />;
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {

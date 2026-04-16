@@ -7,6 +7,8 @@ import {
 } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import DashboardLayout from "./components/layout/DashboardLayout";
+import RoutePersistence from "./components/RoutePersistence";
+import { readLastVisitedRoute } from "./utils/persistence";
 
 const Login = lazy(() => import("./pages/Login"));
 const RegisterClinic = lazy(() => import("./pages/RegisterClinic"));
@@ -23,6 +25,7 @@ const Support = lazy(() => import("./pages/Support"));
 const UpgradePlan = lazy(() => import("./pages/UpgradePlan"));
 const Reports = lazy(() => import("./pages/Reports"));
 const PatientIntakeForm = lazy(() => import("./pages/PatientIntakeForm"));
+const PaystackCallback = lazy(() => import("./pages/PaystackCallback"));
 
 function RouteLoader() {
   return (
@@ -38,18 +41,29 @@ const ProtectedLayout = () => (
   </ProtectedRoute>
 );
 
+function HomeRedirect() {
+  const token =
+    localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken");
+  const lastRoute = readLastVisitedRoute();
+  const fallbackRoute = token ? lastRoute || "/dashboard" : "/login";
+
+  return <Navigate to={fallbackRoute} replace />;
+}
+
 function App() {
   return (
     <Router>
+      <RoutePersistence />
       <Suspense fallback={<RouteLoader />}>
         <Routes>
           {/* Redirect root to login */}
-          <Route path="/" element={<Navigate to="/login" />} />
+          <Route path="/" element={<HomeRedirect />} />
 
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register-clinic" element={<RegisterClinic />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/billing/paystack/callback" element={<PaystackCallback />} />
           <Route path="/support" element={<Support />} />
           <Route path="/intake/:clinicId" element={<PatientIntakeForm />} />
 
@@ -60,7 +74,14 @@ function App() {
             <Route path="/appointments" element={<Appointments />} />
             <Route path="/waiting-room" element={<WaitingRoom />} />
             <Route path="/billing" element={<Billing />} />
-            <Route path="/upgrade" element={<UpgradePlan />} />
+            <Route
+              path="/upgrade"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <UpgradePlan />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/reports" element={<Reports />} />
             
             {/* Require admin/specific roles */}
@@ -91,7 +112,7 @@ function App() {
           </Route>
 
           {/* Fallback for unknown routes */}
-          <Route path="*" element={<Navigate to="/login" />} />
+          <Route path="*" element={<HomeRedirect />} />
         </Routes>
       </Suspense>
     </Router>

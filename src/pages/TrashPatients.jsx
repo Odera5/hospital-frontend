@@ -1,8 +1,9 @@
 // src/pages/TrashPatients.jsx
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import api from "../services/api";
 import Toast from "../components/Toast";
+import ConfirmModal from "../components/ui/ConfirmModal";
 import { getEntityId } from "../utils/entityId";
 
 export default function TrashPatients() {
@@ -11,6 +12,7 @@ export default function TrashPatients() {
   const [toast, setToast] = useState({ message: "", type: "", show: false });
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [confirmConfig, setConfirmConfig] = useState(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,7 +32,7 @@ export default function TrashPatients() {
   // =========================
   // FETCH TRASHED PATIENTS
   // =========================
-  const fetchPatients = async () => {
+  const fetchPatients = useCallback(async () => {
     try {
       const res = await api.get("/patients/trash/all");
       setPatients(res.data || []);
@@ -39,11 +41,11 @@ export default function TrashPatients() {
       console.error(err);
       showToast("Failed to fetch patients", "error");
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchPatients();
-  }, []);
+  }, [fetchPatients]);
 
   // =========================
   // TOAST
@@ -92,7 +94,7 @@ export default function TrashPatients() {
 
   const handlePermanentDelete = async () => {
     if (!selected.size) return showToast("No patients selected", "error");
-    if (!window.confirm("Are you sure? This action cannot be undone!")) return;
+    if (false) return;
     setLoading(true);
     try {
       await api.delete("/patients/trash/permanent", { data: { ids: Array.from(selected) } });

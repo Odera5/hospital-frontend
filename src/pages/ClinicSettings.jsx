@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Settings, Building, Mail, Phone, MapPin, User, DollarSign, AlertTriangle, Save, Power, ArrowLeft, Image as ImageIcon, Palette, Lock, Link as LinkIcon, Copy, CheckCircle } from "lucide-react";
+import { Settings, Building, Mail, Phone, MapPin, User, DollarSign, AlertTriangle, Save, Power, ArrowLeft, Image as ImageIcon, Palette, Lock, Link as LinkIcon, Copy, CheckCircle, Crown } from "lucide-react";
 import api, { logoutCurrentUser } from "../services/api";
 import { DEFAULT_PROCEDURE_PRESETS, formatNaira, normalizeProcedurePresets } from "../constants/billing";
 import { Card, CardContent } from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Toast from "../components/Toast";
+import ConfirmModal from "../components/ui/ConfirmModal";
+import usePersistentState from "../hooks/usePersistentState";
+import { readStoredJson } from "../utils/persistence";
 
 const initialForm = {
   clinicName: "", clinicEmail: "", clinicPhone: "", clinicCity: "", clinicAddress: "", contactPerson: "",
@@ -15,19 +18,54 @@ const initialForm = {
   procedurePresetPrices: DEFAULT_PROCEDURE_PRESETS,
 };
 
+
+
 export default function ClinicSettings() {
   const navigate = useNavigate();
-  const [form, setForm] = useState(initialForm);
+  const clinicSettingsDraftKey = "primuxcare:draft:clinic-settings";
+  const hasSavedClinicDraft = Boolean(readStoredJson(clinicSettingsDraftKey, null));
+  const [form, setForm, clearFormDraft] = usePersistentState(
+    clinicSettingsDraftKey,
+    initialForm,
+  );
+  const [billingInfo, setBillingInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
+  const [confirmConfig, setConfirmConfig] = useState(null);
   
   const storedUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user")) || "null");
-  const isPro = storedUser?.clinic?.plan === "PRO" || storedUser?.clinic?.plan === "ENTERPRISE_AI";
+  const currentClinic = billingInfo || storedUser?.clinic || null;
+  const isPro = currentClinic?.plan === "PRO" || currentClinic?.plan === "ENTERPRISE_AI";
   const intakeUrl = `${window.location.origin}/intake/${storedUser?.clinic?.id}`;
+
+  const syncStoredClinic = (clinicPatch) => {
+    [localStorage, sessionStorage].forEach((storage) => {
+      const rawUser = storage.getItem("user");
+      if (!rawUser) {
+        return;
+      }
+
+      try {
+        const parsedUser = JSON.parse(rawUser);
+        storage.setItem(
+          "user",
+          JSON.stringify({
+            ...parsedUser,
+            clinic: {
+              ...(parsedUser.clinic || {}),
+              ...clinicPatch,
+            },
+          }),
+        );
+      } catch {
+        // ignore broken persisted state
+      }
+    });
+  };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(intakeUrl);
@@ -43,19 +81,25 @@ export default function ClinicSettings() {
     const fetchClinicProfile = async () => {
       try {
         setLoading(true);
-        const response = await api.get("/auth/clinic-profile");
-        const clinic = response.data?.clinic;
-        setForm({
-          clinicName: clinic?.name || "", clinicEmail: clinic?.email || "", clinicPhone: clinic?.phone || "",
-          clinicCity: clinic?.city || "", clinicAddress: clinic?.address || "", contactPerson: clinic?.contactPerson || "",
-          logoUrl: clinic?.logoUrl || "", brandColor: clinic?.brandColor || "#0f172a",
-          procedurePresetPrices: normalizeProcedurePresets(clinic?.procedurePresetPrices),
-        });
+        const [profileResponse, billingResponse] = await Promise.all([
+          api.get("/auth/clinic-profile"),
+          api.get("/billing"),
+        ]);
+        const clinic = profileResponse.data?.clinic;
+        setBillingInfo(billingResponse.data?.clinic || null);
+        if (!hasSavedClinicDraft) {
+          setForm({
+            clinicName: clinic?.name || "", clinicEmail: clinic?.email || "", clinicPhone: clinic?.phone || "",
+            clinicCity: clinic?.city || "", clinicAddress: clinic?.address || "", contactPerson: clinic?.contactPerson || "",
+            logoUrl: clinic?.logoUrl || "", brandColor: clinic?.brandColor || "#0f172a",
+            procedurePresetPrices: normalizeProcedurePresets(clinic?.procedurePresetPrices),
+          });
+        }
       } catch (err) { setToast({ show: true, message: err.response?.data?.message || "Failed to load profile", type: "error" }); } 
       finally { setLoading(false); }
     };
     fetchClinicProfile();
-  }, [navigate]);
+  }, [hasSavedClinicDraft, navigate, setForm]);
 
   const handleChange = (e) => setForm(c => ({ ...c, [e.target.name]: e.target.value }));
   const handleProcedurePriceChange = (index, value) => {
@@ -87,23 +131,21 @@ export default function ClinicSettings() {
     try {
       const response = await api.put("/auth/clinic-profile", form);
       const clinic = response.data?.clinic;
-      const storedUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user")) || "null");
-      if (storedUser) {
-        localStorage.setItem("user", JSON.stringify({ ...storedUser, clinic: { ...storedUser.clinic, ...clinic } }));
-      }
+      syncStoredClinic(clinic);
+      clearFormDraft();
       setForm({
         clinicName: clinic?.name || "", clinicEmail: clinic?.email || "", clinicPhone: clinic?.phone || "",
         clinicCity: clinic?.city || "", clinicAddress: clinic?.address || "", contactPerson: clinic?.contactPerson || "",
         logoUrl: clinic?.logoUrl || "", brandColor: clinic?.brandColor || "#0f172a",
         procedurePresetPrices: normalizeProcedurePresets(clinic?.procedurePresetPrices),
       });
+      setBillingInfo((current) => ({ ...(current || {}), ...clinic }));
       setToast({ show: true, message: response.data?.message || "Profile updated successfully", type: "success" });
     } catch (err) { setToast({ show: true, message: err.response?.data?.message || "Failed to update profile", type: "error" }); } 
     finally { setSaving(false); }
   };
 
-  const handleDeactivateClinic = async () => {
-    if (!window.confirm("Deactivate this clinic account? All staff logins will be blocked until support reactivates the clinic.")) return;
+  const executeDeactivateClinic = async () => {
     try {
       setDeactivating(true);
       await api.patch("/auth/clinic-profile/deactivate");
@@ -111,6 +153,16 @@ export default function ClinicSettings() {
       navigate("/login", { replace: true });
     } catch (err) { setToast({ show: true, message: err.response?.data?.message || "Failed to deactivate clinic", type: "error" }); } 
     finally { setDeactivating(false); }
+  };
+
+  const handleDeactivateClinic = () => {
+    setConfirmConfig({
+      title: "Deactivate Clinic",
+      message: "Deactivate this clinic account? All staff logins will be blocked until support reactivates the clinic.",
+      confirmText: "Yes, Deactivate",
+      danger: true,
+      onConfirm: executeDeactivateClinic
+    });
   };
 
   return (
@@ -252,6 +304,8 @@ export default function ClinicSettings() {
           </div>
 
           <div className="space-y-6">
+
+
             <Card className="border border-emerald-200 bg-emerald-50 shadow-sm">
                <CardContent className="p-6">
                   <div className="mb-6 border-b border-emerald-200/60 pb-6">
@@ -284,6 +338,11 @@ export default function ClinicSettings() {
         </div>
       )}
       {toast.show && <Toast message={toast.message} type={toast.type} duration={3000} onClose={() => setToast({ ...toast, show: false })} />}
+      <ConfirmModal 
+        isOpen={!!confirmConfig} 
+        onClose={() => setConfirmConfig(null)} 
+        {...confirmConfig} 
+      />
     </motion.div>
   );
 }

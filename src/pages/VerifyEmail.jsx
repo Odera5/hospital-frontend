@@ -5,17 +5,19 @@ import api from "../services/api";
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [status, setStatus] = useState("loading");
-  const [message, setMessage] = useState("Confirming your email address...");
-  const [hint, setHint] = useState("");
+  const token = searchParams.get("token");
+  const [status, setStatus] = useState(token ? "loading" : "error");
+  const [message, setMessage] = useState(
+    token
+      ? "Confirming your email address..."
+      : "This verification link is missing a token.",
+  );
+  const [hint, setHint] = useState(
+    token ? "" : "Go back to login and request a new verification email.",
+  );
 
   useEffect(() => {
-    const token = searchParams.get("token");
-
     if (!token) {
-      setStatus("error");
-      setMessage("This verification link is missing a token.");
-      setHint("Go back to login and request a new verification email.");
       return;
     }
 
@@ -44,7 +46,7 @@ export default function VerifyEmail() {
     };
 
     verifyEmail();
-  }, [navigate, searchParams]);
+  }, [navigate, token]);
 
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-10">
