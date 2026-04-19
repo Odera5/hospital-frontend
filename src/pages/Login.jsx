@@ -7,6 +7,7 @@ import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import { clearLastVisitedRoute, readLastVisitedRoute } from "../utils/persistence";
 import usePersistentState from "../hooks/usePersistentState";
+import primuxFavicon from "../assets/PrimuxCareFavicon.png";
 
 export default function Login() {
   const [loginDraft, setLoginDraft, clearLoginDraft] = usePersistentState(
@@ -105,7 +106,7 @@ export default function Login() {
             <div className="mb-6 flex justify-center">
               <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/10 p-1 backdrop-blur-md">
                 <img
-                  src="/primuxcare-logo.png"
+                  src={primuxFavicon}
                   alt="PrimuxCare logo"
                   className="h-full w-full object-contain"
                 />
@@ -133,7 +134,7 @@ export default function Login() {
             <div className="mb-6 flex justify-center lg:hidden">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-100 p-1">
                 <img
-                  src="/primuxcare-logo.png"
+                  src={primuxFavicon}
                   alt="PrimuxCare logo"
                   className="h-full w-full object-contain"
                 />

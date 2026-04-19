@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Mail, MessageCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import Button from "../components/ui/Button";
 import { Card, CardContent } from "../components/ui/Card";
+import primuxFavicon from "../assets/PrimuxCareFavicon.png";
 
 const supportEmail = "primuxcare@gmail.com";
 const whatsappNumber = "08068073362";
@@ -26,7 +27,7 @@ export default function Support() {
         <div className="text-center">
           <div className="flex bg-white/10 backdrop-blur-md h-24 w-24 mx-auto rounded-3xl items-center justify-center mb-6 shadow-xl border border-white/20 p-1">
             <img
-              src="/primuxcare-logo.png"
+              src={primuxFavicon}
               alt="PrimuxCare logo"
               className="h-full w-full object-contain"
             />

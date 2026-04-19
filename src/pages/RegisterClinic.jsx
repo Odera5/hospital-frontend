@@ -6,6 +6,7 @@ import api from "../services/api";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import usePersistentState from "../hooks/usePersistentState";
+import primuxFavicon from "../assets/PrimuxCareFavicon.png";
 
 const initialForm = {
   clinicName: "",
@@ -112,7 +113,7 @@ export default function RegisterClinic() {
             <div className="mb-6 flex">
               <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/10 p-1 backdrop-blur-md">
                 <img
-                  src="/primuxcare-logo.png"
+                  src={primuxFavicon}
                   alt="PrimuxCare logo"
                   className="h-full w-full object-contain"
                 />
@@ -140,7 +141,7 @@ export default function RegisterClinic() {
             <div className="mb-6 flex lg:hidden">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-100 p-1">
                 <img
-                  src="/primuxcare-logo.png"
+                  src={primuxFavicon}
                   alt="PrimuxCare logo"
                   className="h-full w-full object-contain"
                 />
