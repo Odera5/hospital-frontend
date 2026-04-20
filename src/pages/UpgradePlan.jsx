@@ -5,13 +5,12 @@ import Toast from "../components/Toast";
 import Button from "../components/ui/Button";
 import ConfirmModal from "../components/ui/ConfirmModal";
 
-const ACTIVE_PAYSTACK_STATUSES = ["active", "attention"];
+const ACTIVE_PAYSTACK_STATUSES = ["active", "attention", "success"];
 
 export default function UpgradePlan() {
   const [patientCount, setPatientCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [manageLoading, setManageLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [billingInfo, setBillingInfo] = useState(null);
   const [toast, setToast] = useState(null);
@@ -125,29 +124,6 @@ export default function UpgradePlan() {
     });
   };
 
-  const handleManageBilling = async () => {
-    try {
-      setManageLoading(true);
-      const response = await api.get("/billing/paystack/manage-link");
-      const link = response.data?.link;
-
-      if (!link) {
-        throw new Error("Paystack did not return a management link.");
-      }
-
-      window.location.href = link;
-    } catch (error) {
-      setToast({
-        message:
-          error.response?.data?.message ||
-          error.message ||
-          "We could not open Paystack management right now.",
-        type: "error",
-      });
-    } finally {
-      setManageLoading(false);
-    }
-  };
 
   const executeCancelAutoRenew = async () => {
 
@@ -162,7 +138,7 @@ export default function UpgradePlan() {
       setToast({
         message:
           response.data?.message ||
-          "Auto-renew has been disabled successfully.",
+          "Subscription canceled successfully.",
         type: "success",
       });
     } catch (error) {
@@ -170,7 +146,7 @@ export default function UpgradePlan() {
         message:
           error.response?.data?.message ||
           error.message ||
-          "We could not disable auto-renew.",
+          "We could not cancel the subscription.",
         type: "error",
       });
     } finally {
@@ -180,9 +156,9 @@ export default function UpgradePlan() {
 
   const handleCancelAutoRenew = () => {
     setConfirmConfig({
-      title: "Disable Auto-Renew",
-      message: "Disable auto-renew for this clinic's Paystack subscription? The clinic will keep Pro access until the current paid period ends.",
-      confirmText: "Yes, Disable",
+      title: "Cancel Subscription",
+      message: "Are you sure you want to cancel your Pro plan subscription? The clinic will keep Pro access until the current paid period ends.",
+      confirmText: "Yes, Cancel",
       danger: true,
       onConfirm: executeCancelAutoRenew
     });
@@ -342,19 +318,11 @@ export default function UpgradePlan() {
             <div className="mb-6 space-y-3">
               <Button
                 variant="outline"
-                className="w-full border-slate-600 bg-slate-800 text-white hover:bg-slate-700"
-                onClick={handleManageBilling}
-                isLoading={manageLoading}
-              >
-                Open Paystack Manage Page
-              </Button>
-              <Button
-                variant="outline"
                 className="w-full border-red-500/40 bg-red-500/10 text-red-100 hover:bg-red-500/20"
                 onClick={handleCancelAutoRenew}
                 isLoading={cancelLoading}
               >
-                Disable Auto-Renew
+                Cancel Subscription
               </Button>
             </div>
           )}

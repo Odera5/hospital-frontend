@@ -21,7 +21,7 @@ import api from "../../services/api";
 import Button from "../ui/Button";
 import primuxFavicon from "../../assets/PrimuxCareFavicon.png";
 
-const ACTIVE_PAYSTACK_STATUSES = ["active", "attention"];
+const ACTIVE_PAYSTACK_STATUSES = ["active", "attention", "success"];
 
 function NavItem({
   icon: Icon,
@@ -95,14 +95,20 @@ export default function DashboardLayout() {
     paystackSubscriptionStatus,
   );
   let remainingTrialDays = 0;
+  let remainingPaidDays = 0;
 
   if (clinicPlan === "PRO" && subscriptionEnds) {
     const end = new Date(subscriptionEnds);
     const now = new Date();
-    remainingTrialDays = Math.max(
+    const days = Math.max(
       0,
       Math.ceil((end - now) / (1000 * 60 * 60 * 24)),
     );
+    if (!hasActivePaidSubscription) {
+      remainingTrialDays = days;
+    } else {
+      remainingPaidDays = days;
+    }
   }
 
   useEffect(() => {
@@ -425,16 +431,16 @@ export default function DashboardLayout() {
 
         {clinicPlan === "PRO" &&
           hasActivePaidSubscription &&
-          subscriptionEnds && (
+          subscriptionEnds &&
+          remainingPaidDays <= 7 && (
             <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 py-2.5 text-center text-sm font-bold shadow-sm shrink-0 relative z-10 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
               <span className="flex items-center gap-2">
-                <Crown size={18} /> Paid Pro is active until{" "}
+                <Crown size={18} /> Pro Plan renews in {remainingPaidDays} {remainingPaidDays === 1 ? "day" : "days"} (
                 {new Date(subscriptionEnds).toLocaleDateString("en-NG", {
                   year: "numeric",
-                  month: "long",
+                  month: "short",
                   day: "numeric",
-                })}
-                .
+                })}).
               </span>
               <button
                 onClick={() => navigate("/upgrade")}
