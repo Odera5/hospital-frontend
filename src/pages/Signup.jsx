@@ -17,7 +17,7 @@ const initialSignupDraft = {
   role: "nurse",
 };
 
-const supportEmail = "primuxcare@gmail.com";
+const supportEmail = "support@primuxcare.com";
 const whatsappLink = "https://wa.me/2348068073362";
 
 export default function Signup() {

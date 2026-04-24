@@ -6,8 +6,9 @@ import Button from "../components/ui/Button";
 import { Card, CardContent } from "../components/ui/Card";
 import primuxFavicon from "../assets/PrimuxCareFavicon.png";
 
-const supportEmail = "primuxcare@gmail.com";
-const whatsappNumber = "08068073362";
+const supportEmail = "support@primuxcare.com";
+const infoEmail = "info@primuxcare.com";
+const whatsappNumber = "+2348068073362";
 const whatsappLink = "https://wa.me/2348068073362";
 
 export default function Support() {
@@ -22,7 +23,7 @@ export default function Support() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="w-full max-w-2xl z-10 relative space-y-8"
+        className="w-full max-w-4xl z-10 relative space-y-8"
       >
         <div className="text-center">
           <div className="flex bg-white/10 backdrop-blur-md h-24 w-24 mx-auto rounded-3xl items-center justify-center mb-6 shadow-xl border border-white/20 p-1">
@@ -42,9 +43,9 @@ export default function Support() {
 
         <Card className="shadow-2xl border-0 overflow-hidden bg-white/95 backdrop-blur-sm rounded-3xl">
           <div className="p-8 md:p-10">
-            <h2 className="text-2xl font-bold text-slate-900 mb-6">Contact Support</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Contact Us</h2>
             
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-3">
               <a 
                 href={`mailto:${supportEmail}`}
                 className="group flex flex-col p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-primary-50 hover:border-primary-200 transition-all duration-300"
@@ -52,9 +53,21 @@ export default function Support() {
                 <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100 mb-4 group-hover:scale-110 group-hover:bg-primary-600 group-hover:text-white group-hover:border-primary-600 transition-all duration-300">
                   <Mail size={24} className="text-slate-600 group-hover:text-white transition-colors" />
                 </div>
-                <h3 className="font-semibold text-slate-900 mb-1">Email Us</h3>
+                <h3 className="font-semibold text-slate-900 mb-1">Technical Support</h3>
                 <p className="text-primary-600 font-medium group-hover:underline text-sm mb-2">{supportEmail}</p>
-                <p className="text-slate-500 text-sm mt-auto">We typically reply within 2 hours.</p>
+                <p className="text-slate-500 text-sm mt-auto">For technical issues and product assistance.</p>
+              </a>
+
+              <a 
+                href={`mailto:${infoEmail}`}
+                className="group flex flex-col p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-blue-50 hover:border-blue-200 transition-all duration-300"
+              >
+                <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100 mb-4 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all duration-300">
+                  <Mail size={24} className="text-slate-600 group-hover:text-white transition-colors" />
+                </div>
+                <h3 className="font-semibold text-slate-900 mb-1">General Info</h3>
+                <p className="text-blue-600 font-medium group-hover:underline text-sm mb-2">{infoEmail}</p>
+                <p className="text-slate-500 text-sm mt-auto">For general inquiries and billing questions.</p>
               </a>
 
               <a 
