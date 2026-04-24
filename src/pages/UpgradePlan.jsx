@@ -9,6 +9,7 @@ const ACTIVE_PAYSTACK_STATUSES = ["active", "attention", "success"];
 
 export default function UpgradePlan() {
   const [patientCount, setPatientCount] = useState(0);
+  const [isAnnual, setIsAnnual] = useState(false);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -58,7 +59,9 @@ export default function UpgradePlan() {
   const handleUpgradeClick = async () => {
     try {
       setCheckoutLoading(true);
-      const response = await api.post("/billing/paystack/initialize");
+      const response = await api.post("/billing/paystack/initialize", {
+        interval: isAnnual ? "annually" : "monthly",
+      });
       const authorizationUrl = response.data?.authorizationUrl;
 
       if (!authorizationUrl) {
@@ -196,6 +199,30 @@ export default function UpgradePlan() {
         )}
       </div>
 
+      <div className="flex justify-center mb-12">
+        <div className="bg-slate-100 p-1.5 rounded-full inline-flex items-center shadow-inner border border-slate-200">
+          <button
+            onClick={() => setIsAnnual(false)}
+            className={`px-6 py-2.5 text-sm font-bold rounded-full transition-all duration-300 ${
+              !isAnnual ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setIsAnnual(true)}
+            className={`px-6 py-2.5 text-sm font-bold rounded-full transition-all duration-300 flex items-center gap-2 ${
+              isAnnual ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Annually
+            <span className="bg-emerald-100 text-emerald-700 text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold">
+              Save 17%
+            </span>
+          </button>
+        </div>
+      </div>
+
       {!isPro && (
         <div className="mb-12 max-w-3xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-surface-200">
           <div className="flex justify-between items-end mb-2">
@@ -292,10 +319,10 @@ export default function UpgradePlan() {
           </div>
 
           <div className="mb-8 flex items-end gap-1">
-            <span className="text-4xl md:text-5xl font-extrabold text-white">
-              NGN 12,000
+            <span className="text-4xl md:text-5xl font-extrabold text-white transition-all">
+              NGN {isAnnual ? "120,000" : "12,000"}
             </span>
-            <span className="text-slate-400 font-medium mb-1"> / month</span>
+            <span className="text-slate-400 font-medium mb-1 transition-all"> / {isAnnual ? "year" : "month"}</span>
           </div>
 
           <Button
