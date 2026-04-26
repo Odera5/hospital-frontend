@@ -311,7 +311,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           <Card>
             <CardContent className="p-6">
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-center mt-2">
                 <div>
                   <p className="text-sm font-medium text-slate-500">Patients Today</p>
                   <h3 className="text-3xl font-bold text-slate-900 mt-2">{patientsToday.length}</h3>
@@ -325,7 +325,7 @@ export default function Dashboard() {
 
           <Card>
             <CardContent className="p-6">
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-center mt-2">
                 <div>
                   <p className="text-sm font-medium text-slate-500">Appointments</p>
                   <h3 className="text-3xl font-bold text-slate-900 mt-2 flex items-center">
@@ -342,7 +342,7 @@ export default function Dashboard() {
 
           <Card>
             <CardContent className="p-6">
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-center mt-2">
                 <div>
                   <p className="text-sm font-medium text-slate-500">Waiting Room</p>
                   <h3 className="text-3xl font-bold text-slate-900 mt-2">{waitingSummary.waiting}</h3>
@@ -356,7 +356,7 @@ export default function Dashboard() {
 
           <Card>
             <CardContent className="p-6">
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-center mt-2">
                 <div>
                   <p className="text-sm font-medium text-slate-500">Revenue</p>
                   <h3 className="text-3xl font-bold text-slate-900 mt-2 tracking-tight">

@@ -144,6 +144,30 @@ const groupByQuadrant = (teeth, dentition) => {
 export default function RecordForm({ recordData, setRecordData, onSubmit, submitLabel, loading }) {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+
+  const formatDateTimeLocal = (dateString) => {
+    if (!dateString) return "";
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return "";
+      return d.toISOString().slice(0, 16);
+    } catch {
+      return "";
+    }
+  };
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    if (!recordData.consentObtained) {
+      alert("Informed consent must be obtained and documented before saving the record.");
+      return;
+    }
+    if (!recordData.consentDate || !recordData.consentTakenBy?.trim()) {
+      alert("Please provide the consent date and the clinician who took the consent.");
+      return;
+    }
+    onSubmit(e);
+  };
   const [activeExamTab, setActiveExamTab] = useState("extraoral");
   const [showFormulary, setShowFormulary] = useState(false);
   const [formularyCategory, setFormularyCategory] = useState("Antibiotics");
@@ -261,7 +285,7 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
   };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
+    <form onSubmit={handleFormSubmit} className="space-y-6">
       <div className="p-6 border border-slate-200 rounded-2xl shadow-sm bg-white">
         <h2 className="font-bold mb-4 text-lg text-slate-900 border-b border-slate-100 pb-2 flex items-center">Case History</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -475,8 +499,8 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
 
           {recordData.consentObtained && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-xl border border-emerald-100 animate-in fade-in zoom-in-95 duration-200">
-              <FormField label="Date Obtained" name="consentDate" type="datetime-local" value={recordData.consentDate || ""} onChange={handleChange} />
-              <FormField label="Takes By (Clinician)" name="consentTakenBy" value={recordData.consentTakenBy || ""} onChange={handleChange} placeholder="Dr. Name" />
+              <FormField label="Date Obtained" name="consentDate" type="datetime-local" value={formatDateTimeLocal(recordData.consentDate)} onChange={handleChange} required={true} />
+              <FormField label="Takes By (Clinician)" name="consentTakenBy" value={recordData.consentTakenBy || ""} onChange={handleChange} placeholder="Dr. Name" required={true} />
               <div className="md:col-span-2">
                 <FormField label="Consent Details (Optional)" name="consentNotes" value={recordData.consentNotes || ""} onChange={handleChange} type="textarea" rows={2} placeholder="Verbal consent obtained after discussing risks and alternatives..." />
               </div>

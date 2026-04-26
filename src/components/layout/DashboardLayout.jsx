@@ -19,7 +19,7 @@ import {
 import { logoutCurrentUser } from "../../services/api";
 import api from "../../services/api";
 import Button from "../ui/Button";
-import primuxFavicon from "../../assets/PrimuxCareFavicon.png";
+import primuxFavicon from "../../assets/primux-logo.png";
 
 const ACTIVE_PAYSTACK_STATUSES = ["active", "attention", "success"];
 
@@ -215,7 +215,7 @@ export default function DashboardLayout() {
       >
         <div className="flex items-center justify-between p-6 h-20 border-b border-surface-100 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-600 p-1 shadow-inner shadow-primary-800/30">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl  p-1 ">
               <img
                 src={primuxFavicon}
                 alt="PrimuxCare logo"
@@ -377,8 +377,7 @@ export default function DashboardLayout() {
               <Clock size={16} className="text-primary-500 hidden sm:block" />
               {currentTime.toLocaleTimeString([], {
                 hour: "2-digit",
-                minute: "2-digit",
-                timeZoneName: "short"
+                minute: "2-digit"
               })}
             </div>
           </div>

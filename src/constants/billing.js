@@ -12,8 +12,8 @@ export const normalizeProcedurePresets = (value) => {
   const incoming =
     Array.isArray(value) && value.length > 0 ? value : DEFAULT_PROCEDURE_PRESETS;
 
-  return DEFAULT_PROCEDURE_PRESETS.map((fallback, index) => {
-    const preset = incoming[index] || fallback;
+  return incoming.map((preset, index) => {
+    const fallback = DEFAULT_PROCEDURE_PRESETS[index] || DEFAULT_PROCEDURE_PRESETS[0];
     const unitPrice = Number(preset?.unitPrice);
 
     return {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Settings, Building, Mail, Phone, MapPin, User, DollarSign, AlertTriangle, Save, Power, ArrowLeft, Image as ImageIcon, Palette, Lock, Link as LinkIcon, Copy, CheckCircle, Crown } from "lucide-react";
+import { Settings, Building, Mail, Phone, MapPin, User, DollarSign, AlertTriangle, Save, Power, ArrowLeft, Image as ImageIcon, Palette, Lock, Link as LinkIcon, Copy, CheckCircle, Crown, Upload, Trash2, Plus, Edit2 } from "lucide-react";
 import api, { logoutCurrentUser } from "../services/api";
 import { DEFAULT_PROCEDURE_PRESETS, formatNaira, normalizeProcedurePresets } from "../constants/billing";
 import { Card, CardContent } from "../components/ui/Card";
@@ -18,6 +18,9 @@ const initialForm = {
   logoUrl: "", brandColor: "#0f172a",
   procedurePresetPrices: DEFAULT_PROCEDURE_PRESETS,
 };
+
+const PRESET_DESCRIPTIONS = Array.from(new Set(DEFAULT_PROCEDURE_PRESETS.map(p => p.description)));
+const PRESET_CATEGORIES = Array.from(new Set(DEFAULT_PROCEDURE_PRESETS.map(p => p.category)));
 
 
 
@@ -37,6 +40,64 @@ export default function ClinicSettings() {
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [confirmConfig, setConfirmConfig] = useState(null);
+  const [editingPresets, setEditingPresets] = useState({});
+  const [customInputs, setCustomInputs] = useState({});
+
+  const [deactivateStep, setDeactivateStep] = useState(0);
+  const [deactivatePassword, setDeactivatePassword] = useState("");
+  const [deactivateOtp, setDeactivateOtp] = useState("");
+
+  const toggleEditPreset = async (index) => {
+    if (editingPresets[index]) {
+      const preset = form.procedurePresetPrices[index];
+      
+      if (!preset.description || preset.description.trim() === "") {
+        return setToast({ show: true, message: "Procedure description cannot be empty", type: "error" });
+      }
+      if (!preset.category || preset.category.trim() === "") {
+        return setToast({ show: true, message: "Category cannot be empty", type: "error" });
+      }
+      if (preset.unitPrice === "" || isNaN(preset.unitPrice) || Number(preset.unitPrice) < 0) {
+        return setToast({ show: true, message: "Price must be a valid number (0 or greater)", type: "error" });
+      }
+
+      setEditingPresets(prev => ({...prev, [index]: false}));
+      setCustomInputs(prev => ({...prev, [`${index}_desc`]: false, [`${index}_cat`]: false}));
+      
+      const desc = preset.description.trim() || "Procedure";
+      await handleSubmit(null, form, `${desc} saved successfully`);
+    } else {
+      setEditingPresets(prev => ({...prev, [index]: true}));
+    }
+  };
+
+  const handleDeletePreset = async (index) => {
+    const desc = form.procedurePresetPrices[index]?.description || "Procedure";
+    const updatedForm = {
+      ...form,
+      procedurePresetPrices: form.procedurePresetPrices.filter((_, i) => i !== index)
+    };
+    setForm(updatedForm);
+    setEditingPresets(prev => {
+      const next = {...prev};
+      delete next[index];
+      return Object.keys(next).reduce((acc, key) => {
+        const k = parseInt(key);
+        if (k < index) acc[k] = next[k];
+        if (k > index) acc[k - 1] = next[k];
+        return acc;
+      }, {});
+    });
+    await handleSubmit(null, updatedForm, `${desc} deleted successfully`);
+  };
+
+  const handleAddPreset = () => {
+    setForm(c => ({
+      ...c,
+      procedurePresetPrices: [...c.procedurePresetPrices, { description: "New Procedure", category: "General", unitPrice: 0 }]
+    }));
+    setEditingPresets(prev => ({...prev, [form.procedurePresetPrices.length]: true}));
+  };
   
   const storedUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user")) || "null");
   const currentClinic = billingInfo || storedUser?.clinic || null;
@@ -126,11 +187,12 @@ export default function ClinicSettings() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e, customForm = null, customSuccessMsg = null) => {
+    if (e && e.preventDefault) e.preventDefault();
     setSaving(true);
+    const formToSave = customForm || form;
     try {
-      const response = await api.put("/auth/clinic-profile", form);
+      const response = await api.put("/auth/clinic-profile", formToSave);
       const clinic = response.data?.clinic;
       syncStoredClinic(clinic);
       clearFormDraft();
@@ -141,29 +203,45 @@ export default function ClinicSettings() {
         procedurePresetPrices: normalizeProcedurePresets(clinic?.procedurePresetPrices),
       });
       setBillingInfo((current) => ({ ...(current || {}), ...clinic }));
-      setToast({ show: true, message: response.data?.message || "Profile updated successfully", type: "success" });
+      setToast({ show: true, message: customSuccessMsg || response.data?.message || "Profile updated successfully", type: "success" });
     } catch (err) { setToast({ show: true, message: err.response?.data?.message || "Failed to update profile", type: "error" }); } 
     finally { setSaving(false); }
   };
 
-  const executeDeactivateClinic = async () => {
+  const initiateDeactivation = async (e) => {
+    if (e) e.preventDefault();
+    if (!deactivatePassword) return setToast({ show: true, message: "Password is required", type: "error" });
     try {
       setDeactivating(true);
-      await api.patch("/auth/clinic-profile/deactivate");
+      const res = await api.post("/auth/clinic-profile/deactivate/initiate", { password: deactivatePassword });
+      setToast({ show: true, message: res.data.message || "OTP sent to your email", type: "success" });
+      setDeactivateStep(2);
+    } catch (err) {
+      setToast({ show: true, message: err.response?.data?.message || "Failed to initiate deactivation", type: "error" });
+    } finally {
+      setDeactivating(false);
+    }
+  };
+
+  const verifyDeactivation = async (e) => {
+    e.preventDefault();
+    if (!deactivateOtp) return setToast({ show: true, message: "Verification code is required", type: "error" });
+    try {
+      setDeactivating(true);
+      await api.post("/auth/clinic-profile/deactivate/verify", { otp: deactivateOtp });
       await logoutCurrentUser();
       navigate("/login", { replace: true });
-    } catch (err) { setToast({ show: true, message: err.response?.data?.message || "Failed to deactivate clinic", type: "error" }); } 
-    finally { setDeactivating(false); }
+    } catch (err) {
+      setToast({ show: true, message: err.response?.data?.message || "Failed to verify deactivation code", type: "error" });
+    } finally {
+      setDeactivating(false);
+    }
   };
 
   const handleDeactivateClinic = () => {
-    setConfirmConfig({
-      title: "Deactivate Clinic",
-      message: "Deactivate this clinic account? All staff logins will be blocked until support reactivates the clinic.",
-      confirmText: "Yes, Deactivate",
-      danger: true,
-      onConfirm: executeDeactivateClinic
-    });
+    setDeactivateStep(1);
+    setDeactivatePassword("");
+    setDeactivateOtp("");
   };
 
   return (
@@ -186,7 +264,33 @@ export default function ClinicSettings() {
              <Card className="border border-surface-200 shadow-sm relative overflow-hidden">
                 <div className="bg-slate-900 absolute top-0 left-0 w-full h-24 z-0"></div>
                 <CardContent className="p-8 pt-12 relative z-10">
-                   <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 inline-flex mb-6 text-primary-600"><Settings size={32} /></div>
+                   <div className="relative inline-flex mb-6">
+                     <div 
+                       className="bg-white rounded-2xl p-2 shadow-sm border border-slate-100 relative group overflow-hidden w-24 h-24 flex items-center justify-center cursor-pointer shrink-0"
+                       onClick={() => { if(isPro && !uploadingLogo) document.getElementById('logo-upload-top').click(); else if(!isPro) setToast({show: true, message: "Upgrade to PRO to upload a custom logo", type: "error"}); }}
+                     >
+                       {form.logoUrl ? (
+                          <img src={resolveAssetUrl(form.logoUrl)} alt="Clinic Logo" className="w-full h-full object-contain" />
+                       ) : (
+                          <ImageIcon size={32} className="text-slate-400" />
+                       )}
+                       <div className={`absolute inset-0 bg-black/50 opacity-0 ${isPro ? 'group-hover:opacity-100' : ''} transition-opacity flex flex-col items-center justify-center`}>
+                         <Upload size={20} className="text-white mb-1" />
+                         <span className="text-white text-[10px] font-bold">Upload</span>
+                       </div>
+                     </div>
+                     {isPro && form.logoUrl && (
+                       <button
+                         type="button"
+                         className="absolute -top-2 -right-2 bg-white text-slate-400 hover:text-red-500 border border-slate-200 rounded-full p-1.5 shadow-sm transition-colors z-20"
+                         onClick={(e) => { e.stopPropagation(); setForm(c => ({...c, logoUrl: ""})); }}
+                         title="Remove Logo"
+                       >
+                         <Trash2 size={14} />
+                       </button>
+                     )}
+                   </div>
+                   <input type="file" id="logo-upload-top" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={!isPro || uploadingLogo} />
                    <form onSubmit={handleSubmit} className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
                          <Input label="Clinic Name *" name="clinicName" value={form.clinicName} onChange={handleChange} required icon={Building} className="bg-white" />
@@ -214,7 +318,7 @@ export default function ClinicSettings() {
                    <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4">
                       <div>
                         <h3 className="font-bold text-slate-900 text-lg flex items-center mb-1"><Palette size={20} className="mr-2 text-primary-600" /> Custom Branding</h3>
-                        <p className="text-slate-500 text-sm">Add your logo and distinct color to Invoices.</p>
+                        <p className="text-slate-500 text-sm">Add your distinct brand color to Invoices.</p>
                       </div>
                       {!isPro && (
                         <div className="bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center border border-amber-200">
@@ -225,30 +329,20 @@ export default function ClinicSettings() {
 
                    <div className={`space-y-6 ${!isPro ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Clinic Logo</label>
-                        <div className="flex items-center gap-4">
-                          {form.logoUrl ? (
-                             <img src={resolveAssetUrl(form.logoUrl)} alt="Logo" className="h-16 w-16 object-contain rounded border border-slate-200 p-1 bg-white" />
-                          ) : (
-                             <div className="h-16 w-16 bg-slate-100 rounded border border-slate-200 flex items-center justify-center text-slate-400"><ImageIcon size={24} /></div>
-                          )}
-                          <div>
-                            <input type="file" id="logo-upload" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={!isPro || uploadingLogo} />
-                            <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('logo-upload').click()} isLoading={uploadingLogo} className="bg-white border-slate-300">
-                               Upload New Logo
-                            </Button>
-                            <p className="text-xs text-slate-400 mt-1">Recommended: PNG/JPG under 10MB.</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Brand Accent Color</label>
                         <div className="flex items-center gap-3">
                            <input type="color" name="brandColor" value={form.brandColor} onChange={handleChange} disabled={!isPro} className="h-10 w-16 rounded border border-slate-200 cursor-pointer p-0.5" />
                            <Input name="brandColor" value={form.brandColor} onChange={handleChange} disabled={!isPro} placeholder="#HEX" className="bg-white" />
                         </div>
                       </div>
+                      
+                      {isPro && (
+                        <div className="pt-4 mt-2">
+                           <Button onClick={handleSubmit} isLoading={saving} className="shadow-md">
+                              <Save size={18} className="mr-2" /> Save Custom Branding
+                           </Button>
+                        </div>
+                      )}
                    </div>
                    {!isPro && (
                      <div className="absolute inset-0 bg-white/40 flex items-center justify-center z-10 backdrop-blur-[1px]">
@@ -274,12 +368,13 @@ export default function ClinicSettings() {
                     </div>
                     
                     <div className={`mt-4 ${!isPro ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
-                       <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 font-mono truncate select-all">
+                       <div className="grid grid-cols-[1fr_auto] gap-2 w-full">
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 font-mono truncate select-all flex items-center">
                              {intakeUrl}
                           </div>
-                          <Button variant="outline" onClick={handleCopyLink} className="shrink-0 bg-white shadow-sm border-slate-300">
-                             {copied ? <CheckCircle size={18} className="text-emerald-500" /> : <Copy size={18} />}
+                          <Button variant="outline" onClick={handleCopyLink} className="h-full px-4 bg-white shadow-sm border-slate-300 whitespace-nowrap">
+                             {copied ? <CheckCircle size={18} className="text-emerald-500 mr-2" /> : <Copy size={18} className="mr-2" />}
+                             {copied ? "Copied" : "Copy"}
                           </Button>
                        </div>
                        <p className="text-xs text-slate-400 mt-3">Link connects directly to your secure patient directory.</p>
@@ -315,23 +410,125 @@ export default function ClinicSettings() {
                   </div>
 
                   <div className="space-y-3">
-                     {form.procedurePresetPrices.map((preset, index) => (
-                       <div key={preset.description} className="bg-white rounded-xl border border-emerald-100 p-4 shadow-sm flex flex-col gap-3 group hover:border-emerald-300 transition-colors">
-                          <div className="flex items-start justify-between">
-                             <div>
-                                <p className="font-bold text-slate-900 text-sm leading-tight">{preset.description}</p>
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 mt-1">{preset.category}</p>
+                     {form.procedurePresetPrices.map((preset, index) => {
+                       const isEditing = editingPresets[index];
+                       const showCustomDesc = customInputs[`${index}_desc`];
+                       const showCustomCat = customInputs[`${index}_cat`];
+                       return (
+                       <div key={index} className="bg-white rounded-xl border border-emerald-100 p-4 shadow-sm flex flex-col gap-3 group hover:border-emerald-300 transition-colors">
+                          <div className="flex flex-col">
+                             <div className="flex-1 mb-3">
+                                {isEditing ? (
+                                   <>
+                                     {showCustomDesc ? (
+                                       <div className="flex w-full mb-2">
+                                         <input 
+                                            autoFocus
+                                            value={preset.description} 
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setForm(c => ({...c, procedurePresetPrices: c.procedurePresetPrices.map((p, i) => i === index ? {...p, description: val} : p)}));
+                                            }}
+                                            className="flex-1 text-sm font-bold bg-slate-100 border border-emerald-200 rounded-l p-1.5 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-800"
+                                            placeholder="Type custom procedure..."
+                                         />
+                                         <button type="button" onClick={() => setCustomInputs(prev => ({...prev, [`${index}_desc`]: false}))} className="bg-slate-200 px-3 border border-l-0 border-emerald-200 rounded-r hover:bg-slate-300 text-slate-600 font-bold">✕</button>
+                                       </div>
+                                     ) : (
+                                       <select 
+                                          value={PRESET_DESCRIPTIONS.includes(preset.description) || !preset.description ? preset.description : "custom"} 
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === "custom") {
+                                               setCustomInputs(prev => ({...prev, [`${index}_desc`]: true}));
+                                               setForm(c => ({...c, procedurePresetPrices: c.procedurePresetPrices.map((p, i) => i === index ? {...p, description: ""} : p)}));
+                                            } else {
+                                               setForm(c => ({...c, procedurePresetPrices: c.procedurePresetPrices.map((p, i) => i === index ? {...p, description: val} : p)}));
+                                            }
+                                          }}
+                                          className="w-full mb-2 text-sm font-bold bg-slate-100 border border-emerald-200 rounded p-1.5 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-800 cursor-pointer"
+                                       >
+                                         <option value="" disabled>Select Procedure</option>
+                                         <option value="custom" className="font-bold text-primary-600">-- Type Custom Procedure --</option>
+                                         {PRESET_DESCRIPTIONS.map(desc => <option key={desc} value={desc}>{desc}</option>)}
+                                         {!PRESET_DESCRIPTIONS.includes(preset.description) && preset.description && <option value={preset.description}>{preset.description}</option>}
+                                       </select>
+                                     )}
+
+                                     {showCustomCat ? (
+                                       <div className="flex w-full">
+                                         <input 
+                                            autoFocus
+                                            value={preset.category} 
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setForm(c => ({...c, procedurePresetPrices: c.procedurePresetPrices.map((p, i) => i === index ? {...p, category: val} : p)}));
+                                            }}
+                                            className="flex-1 text-xs font-semibold uppercase tracking-wider bg-slate-100 border border-emerald-200 rounded-l p-1.5 focus:ring-2 focus:ring-emerald-500 outline-none text-emerald-700"
+                                            placeholder="Type custom category..."
+                                         />
+                                         <button type="button" onClick={() => setCustomInputs(prev => ({...prev, [`${index}_cat`]: false}))} className="bg-slate-200 px-3 border border-l-0 border-emerald-200 rounded-r hover:bg-slate-300 text-slate-600 font-bold">✕</button>
+                                       </div>
+                                     ) : (
+                                       <select 
+                                          value={PRESET_CATEGORIES.includes(preset.category) || !preset.category ? preset.category : "custom"} 
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === "custom") {
+                                               setCustomInputs(prev => ({...prev, [`${index}_cat`]: true}));
+                                               setForm(c => ({...c, procedurePresetPrices: c.procedurePresetPrices.map((p, i) => i === index ? {...p, category: ""} : p)}));
+                                            } else {
+                                               setForm(c => ({...c, procedurePresetPrices: c.procedurePresetPrices.map((p, i) => i === index ? {...p, category: val} : p)}));
+                                            }
+                                          }}
+                                          className="w-full text-xs font-semibold uppercase tracking-wider bg-slate-100 border border-emerald-200 rounded p-1.5 focus:ring-2 focus:ring-emerald-500 outline-none text-emerald-700 cursor-pointer"
+                                       >
+                                         <option value="" disabled>Select Category</option>
+                                         <option value="custom" className="font-bold text-primary-600">-- Type Custom Category --</option>
+                                         {PRESET_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                         {!PRESET_CATEGORIES.includes(preset.category) && preset.category && <option value={preset.category}>{preset.category}</option>}
+                                       </select>
+                                     )}
+                                   </>
+                                ) : (
+                                   <>
+                                     <p className="font-bold text-slate-900 text-sm leading-tight">{preset.description}</p>
+                                     <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 mt-1">{preset.category}</p>
+                                   </>
+                                )}
                              </div>
-                             <div className="text-right">
-                                <span className="text-xs font-semibold text-slate-400">Price (NGN)</span>
-                                <input type="number" min="0" step="0.01" value={preset.unitPrice} onChange={(e) => handleProcedurePriceChange(index, e.target.value)} className="w-full text-right font-mono font-bold text-slate-900 border-0 focus:ring-0 p-0 text-base bg-transparent mt-1 group-hover:text-emerald-700 transition-colors" />
+                             <div className="flex flex-col items-end justify-center">
+                                {isEditing && <span className="text-xs font-semibold text-slate-400 mb-1 w-full text-right">Price (NGN)</span>}
+                                {isEditing ? (
+                                   <input 
+                                      type="number" min="0" step="0.01" 
+                                      value={preset.unitPrice} 
+                                      onChange={(e) => handleProcedurePriceChange(index, e.target.value)} 
+                                      className="w-full text-right font-mono font-bold text-slate-900 border border-emerald-200 rounded p-1.5 text-base bg-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none" 
+                                   />
+                                ) : (
+                                   <div className="text-sm font-bold text-emerald-700 bg-emerald-100/60 px-3 py-1.5 rounded-lg group-hover:bg-emerald-200/60 transition-colors inline-block w-fit text-right">
+                                      {formatNaira(preset.unitPrice)}
+                                   </div>
+                                )}
                              </div>
                           </div>
-                          <div className="border-t border-emerald-50 pt-2 text-right">
-                            <span className="text-xs font-bold text-emerald-700 bg-emerald-100/50 px-2 py-1 rounded">{formatNaira(preset.unitPrice)}</span>
+                          <div className="border-t border-emerald-50 pt-3 flex items-center justify-between">
+                            <div className="flex gap-2">
+                               <Button type="button" size="sm" variant={isEditing ? "default" : "outline"} onClick={() => toggleEditPreset(index)} className={isEditing ? "bg-emerald-600 hover:bg-emerald-700 text-white border-0 shadow-sm" : "text-slate-600 bg-white"}>
+                                 {isEditing ? <><Save size={14} className="mr-1.5" /> Save</> : <><Edit2 size={14} className="mr-1.5" /> Edit</>}
+                               </Button>
+                               <Button type="button" size="sm" variant="ghost" onClick={() => handleDeletePreset(index)} className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2">
+                                 <Trash2 size={16} />
+                               </Button>
+                            </div>
                           </div>
                        </div>
-                     ))}
+                       );
+                     })}
+                     <Button type="button" variant="outline" onClick={handleAddPreset} className="w-full border-dashed border-emerald-300 text-emerald-700 hover:bg-emerald-50 py-4">
+                       <Plus size={16} className="mr-2" /> Add New Procedure Preset
+                     </Button>
                   </div>
                </CardContent>
             </Card>
@@ -344,6 +541,74 @@ export default function ClinicSettings() {
         onClose={() => setConfirmConfig(null)} 
         {...confirmConfig} 
       />
+
+      {deactivateStep > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center mb-2">
+                <AlertTriangle className="text-red-600 mr-2" size={24} />
+                Deactivate Clinic
+              </h3>
+              
+              {deactivateStep === 1 && (
+                <form onSubmit={initiateDeactivation}>
+                  <p className="text-sm font-semibold text-red-600 bg-red-50 p-3 rounded-lg mb-4 border border-red-100">
+                    Warning: All clinic data may be lost when deactivated. All staff will be logged out immediately.
+                  </p>
+                  <p className="text-sm text-slate-600 mb-4">
+                    Please enter your password to confirm your identity before proceeding.
+                  </p>
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Password</label>
+                    <input
+                      type="password"
+                      value={deactivatePassword}
+                      onChange={(e) => setDeactivatePassword(e.target.value)}
+                      className="w-full text-sm font-medium bg-slate-50 border border-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-red-500 outline-none"
+                      placeholder="Enter your password"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-3">
+                    <Button type="button" variant="outline" onClick={() => setDeactivateStep(0)}>Cancel</Button>
+                    <Button type="submit" className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm" isLoading={deactivating}>Continue</Button>
+                  </div>
+                </form>
+              )}
+
+              {deactivateStep === 2 && (
+                <form onSubmit={verifyDeactivation}>
+                  <p className="text-sm text-slate-600 mb-4">
+                    We've sent a 6-digit verification code to your email. Enter it below to complete deactivation.
+                  </p>
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Verification Code</label>
+                    <input
+                      type="text"
+                      value={deactivateOtp}
+                      onChange={(e) => setDeactivateOtp(e.target.value)}
+                      className="w-full text-center text-2xl tracking-widest font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-red-500 outline-none"
+                      placeholder="------"
+                      maxLength={6}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mb-6">
+                    <button type="button" onClick={initiateDeactivation} disabled={deactivating} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 bg-transparent border-0 outline-none cursor-pointer">
+                      Resend Code
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-end gap-3">
+                    <Button type="button" variant="outline" onClick={() => setDeactivateStep(0)}>Cancel</Button>
+                    <Button type="submit" className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm" isLoading={deactivating}>Yes, Deactivate</Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

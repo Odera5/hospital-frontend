@@ -57,6 +57,7 @@ export default function PatientRecord() {
   const [patientSaveLoading, setPatientSaveLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmConfig, setConfirmConfig] = useState(null);
+  const [isTrashView, setIsTrashView] = useState(false);
 
   const showToast = (message, type = "success") => setToast({ show: true, message, type });
 
@@ -93,13 +94,13 @@ export default function PatientRecord() {
             phone: resPatient.data?.phone || "", email: resPatient.data?.email || "", address: resPatient.data?.address || "",
           });
         }
-        const resRecords = await api.get(`/patients/${id}/records`);
+        const resRecords = await api.get(`/patients/${id}/records?trash=${isTrashView}`);
         setRecords(resRecords.data);
         setFilteredRecords(resRecords.data);
       } catch { showToast("Failed to fetch patient data", "error"); } finally { setLoading(false); }
     };
     fetchPatient();
-  }, [hasSavedPatientEditDraft, id, setPatientForm]);
+  }, [hasSavedPatientEditDraft, id, setPatientForm, isTrashView]);
 
   const handleAddRecord = async (recordData) => {
     try {
@@ -130,6 +131,46 @@ export default function PatientRecord() {
       confirmText: "Delete Record",
       danger: true,
       onConfirm: () => executeDeleteRecord(recordId)
+    });
+  };
+
+  const executeRestoreRecord = async (recordId) => {
+    try {
+      await api.patch(`/patients/${id}/records/${recordId}/restore`);
+      const updatedRecords = records.filter((r) => getEntityId(r) !== recordId);
+      setRecords(updatedRecords);
+      setFilteredRecords(updatedRecords);
+      showToast("Record restored successfully!", "success");
+    } catch (err) { showToast(err.response?.data?.message || "Failed to restore record", "error"); }
+  };
+
+  const handleRestoreRecord = (recordId) => {
+    setConfirmConfig({
+      title: "Restore Clinical Record",
+      message: "Are you sure you want to restore this clinical record?",
+      confirmText: "Restore Record",
+      danger: false,
+      onConfirm: () => executeRestoreRecord(recordId)
+    });
+  };
+
+  const executeHardDeleteRecord = async (recordId) => {
+    try {
+      await api.delete(`/patients/${id}/records/${recordId}/hard`);
+      const updatedRecords = records.filter((r) => getEntityId(r) !== recordId);
+      setRecords(updatedRecords);
+      setFilteredRecords(updatedRecords);
+      showToast("Record permanently deleted!", "success");
+    } catch (err) { showToast(err.response?.data?.message || "Failed to permanently delete record", "error"); }
+  };
+
+  const handleHardDeleteRecord = (recordId) => {
+    setConfirmConfig({
+      title: "Delete Clinical Record Permanently",
+      message: "Are you sure you want to permanently delete this clinical record? This action CANNOT be undone and all attachments will be lost.",
+      confirmText: "Delete Permanently",
+      danger: true,
+      onConfirm: () => executeHardDeleteRecord(recordId)
     });
   };
 
@@ -202,6 +243,11 @@ export default function PatientRecord() {
         </div>
       </div>
 
+      <div className="flex justify-center md:justify-start gap-2 border-b border-slate-200 mt-6">
+         <button onClick={() => setIsTrashView(false)} className={`py-3 px-6 font-bold text-sm border-b-2 transition-colors ${!isTrashView ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Active Records</button>
+         <button onClick={() => setIsTrashView(true)} className={`py-3 px-6 font-bold text-sm border-b-2 transition-colors ${isTrashView ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Trash</button>
+      </div>
+
       <SearchFilterSort records={records} onFiltered={handleFiltered} storageKey={`primuxcare:draft:patient-record:filters:${id}`} />
 
       <div className="space-y-4">
@@ -213,7 +259,7 @@ export default function PatientRecord() {
           </div>
         ) : (
           paginatedRecords.map((record) => (
-            <RecordItem key={getEntityId(record)} record={record} expandedRecordId={expandedRecordId} setExpandedRecordId={setExpandedRecordId} handleDelete={handleDeleteRecord} handleSaveEdit={handleSaveEdit} searchKeyword={searchKeyword} canManageRecords={canManageRecords} />
+            <RecordItem key={getEntityId(record)} record={record} expandedRecordId={expandedRecordId} setExpandedRecordId={setExpandedRecordId} handleDelete={handleDeleteRecord} handleRestore={handleRestoreRecord} handleHardDelete={handleHardDeleteRecord} handleSaveEdit={handleSaveEdit} searchKeyword={searchKeyword} canManageRecords={canManageRecords} />
           ))
         )}
       </div>

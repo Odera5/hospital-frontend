@@ -16,7 +16,7 @@ export default function Toast({ message, type = "success", duration = 3000, onCl
 
   return (
     <div
-      className={`fixed top-4 right-4 px-4 py-2 rounded shadow-md text-white z-50
+      className={`fixed top-4 right-4 px-4 py-2 rounded shadow-md text-white z-[9999]
         ${type === "success" ? "bg-green-600" : "bg-red-600"} 
         transform transition-transform duration-500`}
     >

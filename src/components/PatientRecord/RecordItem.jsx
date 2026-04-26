@@ -20,7 +20,14 @@ function RecordSection({ title, content, icon: Icon, keyword }) {
   );
 }
 
-function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelete, handleSaveEdit, searchKeyword, virtualizer, canManageRecords = false }) {
+function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelete, handleRestore, handleHardDelete, handleSaveEdit, searchKeyword, virtualizer, canManageRecords = false }) {
+  const formatWithCommas = (text) => {
+    if (!text) return text;
+    return text.split('\n')
+      .map(s => s.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, '').replace(/\.$/, '').trim())
+      .filter(Boolean)
+      .join(', ');
+  };
   const recordId = getEntityId(record);
   const [isEditing, setIsEditing, clearEditingFlag] = usePersistentState(
     `primuxcare:draft:record-edit-open:${recordId}`,
@@ -31,6 +38,7 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
     { ...createEmptyRecord(), ...record },
   );
   const [loading, setLoading] = useState(false);
+  const [showAttachments, setShowAttachments] = useState(false);
   const isExpanded = expandedRecordId === recordId;
 
   useEffect(() => { if (virtualizer) virtualizer.measure(); }, [isExpanded, virtualizer]);
@@ -70,7 +78,7 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
              <span className="inline-flex items-center text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full"><Calendar size={12} className="mr-1.5" /> {record.createdAt ? new Date(record.createdAt).toLocaleDateString() : "-"}</span>
              <h3 className="font-bold text-slate-900 text-lg flex items-center"><Activity size={16} className="mr-2 text-rose-500" /> <HighlightText text={record.diagnosis || "No Diagnosis Recorded"} keyword={searchKeyword} /></h3>
           </div>
-          <p className="text-sm text-slate-600 line-clamp-1"><strong className="text-slate-800">C/O:</strong> <HighlightText text={record.presentingComplaint || "N/A"} keyword={searchKeyword} /></p>
+          <p className="text-sm text-slate-600 line-clamp-1"><strong className="text-slate-800">C/O:</strong> <HighlightText text={formatWithCommas(record.presentingComplaint) || "N/A"} keyword={searchKeyword} /></p>
         </div>
         <div className="mt-4 sm:mt-0 sm:ml-4 flex items-center justify-end">
           <div className={`p-2 rounded-full transition-colors ${isExpanded ? 'bg-white shadow-sm text-primary-600' : 'text-slate-400 bg-slate-50'}`}>
@@ -85,9 +93,9 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
             <div className="p-6 border-t border-slate-100 bg-white">
               
               <RecordSection title="History of Presenting Complaint" content={record.history} icon={Clock} keyword={searchKeyword} />
-              <RecordSection title="Medical History / Comorbidities" content={record.comorbidities} icon={Activity} keyword={searchKeyword} />
-              <RecordSection title="Allergies" content={record.allergies} icon={AlertCircle} keyword={searchKeyword} />
-              <RecordSection title="Current Medications" content={record.currentMedication} icon={Activity} keyword={searchKeyword} />
+              <RecordSection title="Medical History / Comorbidities" content={formatWithCommas(record.comorbidities)} icon={Activity} keyword={searchKeyword} />
+              <RecordSection title="Allergies" content={formatWithCommas(record.allergies)} icon={AlertCircle} keyword={searchKeyword} />
+              <RecordSection title="Current Medications" content={formatWithCommas(record.currentMedication)} icon={Activity} keyword={searchKeyword} />
 
               {examSections.length > 0 ? (
                 <div className="mb-4 bg-slate-50 rounded-xl p-4 border border-slate-100">
@@ -124,10 +132,10 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <RecordSection title="Investigation" content={record.investigation} icon={FileText} keyword={searchKeyword} />
-                 <RecordSection title="Treatment Plan" content={record.treatmentPlan} icon={PenTool} keyword={searchKeyword} />
+                 <RecordSection title="Treatment Plan" content={formatWithCommas(record.treatmentPlan)} icon={PenTool} keyword={searchKeyword} />
               </div>
               
-              <RecordSection title="Medications Prescribed" content={record.medication} icon={Activity} keyword={searchKeyword} />
+              <RecordSection title="Medications Prescribed" content={formatWithCommas(record.medication)} icon={Activity} keyword={searchKeyword} />
 
               {(() => {
                  let atts = [];
@@ -136,16 +144,11 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
                  
                  if (atts.length > 0) {
                    return (
-                     <div className="mb-4 bg-slate-50 rounded-xl p-4 border border-slate-100">
-                       <h4 className="flex items-center text-sm font-bold text-slate-700 mb-3 uppercase tracking-widest"><ImagePlus size={14} className="mr-2 text-primary-500" /> Attached Media</h4>
-                       <div className="flex flex-wrap gap-4">
-                         {atts.map((att, idx) => (
-                           <a key={idx} href={`${api.defaults.baseURL.replace('/api', '')}${att.url}`} target="_blank" rel="noopener noreferrer" className="relative group bg-white border border-slate-200 hover:border-primary-300 rounded-xl p-2 flex flex-col items-center justify-center w-24 h-24 sm:w-32 sm:h-32 shadow-sm transition-all hover:shadow-md overflow-hidden">
-                             {att.type?.includes('pdf') ? <FileText size={32} className="text-rose-500 mb-2"/> : <img src={`${api.defaults.baseURL.replace('/api', '')}${att.url}`} alt={att.name} className="w-full h-full object-cover rounded-lg mb-1" />}
-                             <span className="text-[10px] text-slate-500 truncate w-full text-center block font-medium absolute bottom-0 left-0 bg-white/90 px-1 py-0.5 backdrop-blur-sm rounded-b-xl border-t border-slate-100 group-hover:text-primary-700">{att.name}</span>
-                           </a>
-                         ))}
-                       </div>
+                     <div className="mb-4 bg-slate-50 rounded-xl p-4 border border-slate-100 flex items-center justify-between">
+                       <h4 className="flex items-center text-sm font-bold text-slate-700 uppercase tracking-widest"><ImagePlus size={14} className="mr-2 text-primary-500" /> Attached Media</h4>
+                       <Button variant="outline" size="sm" onClick={() => setShowAttachments(true)} className="bg-white border-slate-200">
+                         View Attachments ({atts.length})
+                       </Button>
                      </div>
                    );
                  }
@@ -168,10 +171,16 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
                     </div>
                  </div>
 
-                 {canManageRecords && (
+                 {canManageRecords && !record.isDeleted && (
                    <div className="flex items-center gap-2 w-full md:w-auto">
                      <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="flex-1 md:flex-none focus:ring-2 focus:ring-primary-500 bg-white"><Edit2 size={16} className="mr-2" /> Edit Record</Button>
                      <Button variant="ghost" size="sm" onClick={() => handleDelete(recordId)} className="flex-1 md:flex-none text-red-600 hover:text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500"><Trash2 size={16} className="mr-2" /> Delete</Button>
+                   </div>
+                 )}
+                 {canManageRecords && record.isDeleted && (
+                   <div className="flex items-center gap-2 w-full md:w-auto">
+                     <Button variant="outline" size="sm" onClick={() => handleRestore(recordId)} className="flex-1 md:flex-none focus:ring-2 focus:ring-emerald-500 bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50"><Activity size={16} className="mr-2" /> Restore</Button>
+                     <Button variant="ghost" size="sm" onClick={() => handleHardDelete(recordId)} className="flex-1 md:flex-none text-red-600 hover:text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500"><Trash2 size={16} className="mr-2" /> Delete Permanently</Button>
                    </div>
                  )}
               </div>
@@ -179,6 +188,27 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
           </div>
         )}
       </AnimatePresence>
+
+      {showAttachments && (() => {
+        let atts = [];
+        if (Array.isArray(record.attachments)) atts = record.attachments;
+        else if (typeof record.attachments === 'string') { try { atts = JSON.parse(record.attachments); } catch { atts = []; } }
+        return (
+          <Modal onClose={() => setShowAttachments(false)}>
+            <div className="mb-6 border-b border-slate-100 pb-4">
+              <h2 className="text-2xl font-bold text-slate-900">Media & Attachments</h2>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              {atts.map((att, idx) => (
+                <a key={idx} href={`${api.defaults.baseURL.replace('/api', '')}${att.url}`} target="_blank" rel="noopener noreferrer" className="relative group bg-slate-50 border border-slate-200 hover:border-primary-300 rounded-xl p-2 flex flex-col items-center justify-center w-32 h-32 sm:w-40 sm:h-40 shadow-sm transition-all hover:shadow-md overflow-hidden">
+                  {att.type?.includes('pdf') ? <FileText size={40} className="text-rose-500 mb-2"/> : <img src={`${api.defaults.baseURL.replace('/api', '')}${att.url}`} alt={att.name} className="w-full h-full object-cover rounded-lg mb-1" />}
+                  <span className="text-xs text-slate-500 truncate w-full text-center block font-medium absolute bottom-0 left-0 bg-white/90 px-1 py-1 backdrop-blur-sm rounded-b-xl border-t border-slate-100 group-hover:text-primary-700">{att.name}</span>
+                </a>
+              ))}
+            </div>
+          </Modal>
+        );
+      })()}
 
       {isEditing && canManageRecords && (
         <Modal onClose={cancelEditing}>
