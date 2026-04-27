@@ -47,11 +47,7 @@ const ProtectedLayout = () => (
 function HomeRedirect() {
   const token =
     localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken");
-  let lastRoute = readLastVisitedRoute();
-  
-  if (lastRoute && lastRoute.startsWith("/waitlist")) {
-    lastRoute = null;
-  }
+  const lastRoute = readLastVisitedRoute();
   
   const fallbackRoute = token ? lastRoute || "/dashboard" : "/login";
 

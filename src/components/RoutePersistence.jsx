@@ -10,6 +10,8 @@ const IGNORED_PREFIXES = [
   "/billing/paystack/callback",
   "/intake/",
   "/waitlist",
+  "/forgot-password",
+  "/reset-password",
 ];
 
 function shouldPersistRoute(pathname) {

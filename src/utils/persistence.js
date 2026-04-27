@@ -9,6 +9,9 @@ const INVALID_LAST_ROUTE_PREFIXES = [
   "/verify-email",
   "/support",
   "/billing/paystack/callback",
+  "/forgot-password",
+  "/reset-password",
+  "/waitlist",
 ];
 
 function canUseStorage(storage) {
