@@ -182,7 +182,6 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
     const currentMed = recordData.medication ? recordData.medication.trim() : "";
     const updatedMed = currentMed ? `${currentMed}\n${medValue}` : medValue;
     setRecordData({ ...recordData, medication: updatedMed });
-    setShowFormulary(false);
   };
 
   const handleTemplateSelect = (value) => {
@@ -190,7 +189,6 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
     const currentText = recordData[activeTemplateType] ? recordData[activeTemplateType].trim() : "";
     const updatedText = currentText ? `${currentText}\n${value}` : value;
     setRecordData({ ...recordData, [activeTemplateType]: updatedText });
-    setActiveTemplateType(null);
   };
 
   const openTemplateModal = (type) => {
@@ -516,8 +514,8 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
       </div>
 
       {showUpgradeModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-slate-200 text-center flex flex-col items-center">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setShowUpgradeModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-slate-200 text-center flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
             <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
               <Lock size={32} />
             </div>
@@ -534,8 +532,8 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
       )}
 
       {activeTemplateType && CLINICAL_TEMPLATES[activeTemplateType] && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full flex flex-col border border-slate-200 max-h-[80vh]">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setActiveTemplateType(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full flex flex-col border border-slate-200 max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center p-5 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900 flex items-center"><BookOpen size={20} className="mr-2 text-primary-600" /> {CLINICAL_TEMPLATES[activeTemplateType].title}</h3>
               <button type="button" onClick={() => setActiveTemplateType(null)} className="text-slate-400 hover:text-slate-600 font-bold p-1">&times;</button>
@@ -579,8 +577,8 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
       )}
 
       {showFormulary && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full flex flex-col border border-slate-200 max-h-[80vh]">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setShowFormulary(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full flex flex-col border border-slate-200 max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center p-5 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900 flex items-center"><BookOpen size={20} className="mr-2 text-primary-600" /> Dental Formulary</h3>
               <button type="button" onClick={() => setShowFormulary(false)} className="text-slate-400 hover:text-slate-600 font-bold p-1">&times;</button>

@@ -210,6 +210,10 @@ export default function Login() {
                 />
                 <span className="ml-2 text-sm text-slate-600">Remember me</span>
               </label>
+
+              <Link to="/forgot-password" className="text-sm font-semibold text-primary-600 hover:text-primary-500 transition-colors">
+                Forgot password?
+              </Link>
             </div>
 
             <Button type="submit" isLoading={loading} size="lg">

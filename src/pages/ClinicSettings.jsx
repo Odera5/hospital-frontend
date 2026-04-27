@@ -1,20 +1,22 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Settings, Building, Mail, Phone, MapPin, User, DollarSign, AlertTriangle, Save, Power, ArrowLeft, Image as ImageIcon, Palette, Lock, Link as LinkIcon, Copy, CheckCircle, Crown, Upload, Trash2, Plus, Edit2 } from "lucide-react";
+import { Settings, Building, Mail, Phone, MapPin, User, DollarSign, AlertTriangle, Save, Power, ArrowLeft, Image as ImageIcon, Palette, Lock, Link as LinkIcon, Copy, CheckCircle, Crown, Upload, Trash2, Plus, Edit2, Globe } from "lucide-react";
 import api, { logoutCurrentUser } from "../services/api";
 import { DEFAULT_PROCEDURE_PRESETS, formatNaira, normalizeProcedurePresets } from "../constants/billing";
 import { Card, CardContent } from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
 import Toast from "../components/Toast";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import usePersistentState from "../hooks/usePersistentState";
 import { readStoredJson } from "../utils/persistence";
 import { resolveAssetUrl } from "../utils/assetUrl";
+import { COUNTRIES } from "../constants/countries";
 
 const initialForm = {
-  clinicName: "", clinicEmail: "", clinicPhone: "", clinicCity: "", clinicAddress: "", contactPerson: "",
+  clinicName: "", clinicEmail: "", clinicPhone: "", clinicCountry: "", clinicCity: "", clinicAddress: "", contactPerson: "",
   logoUrl: "", brandColor: "#0f172a",
   procedurePresetPrices: DEFAULT_PROCEDURE_PRESETS,
 };
@@ -152,7 +154,7 @@ export default function ClinicSettings() {
         if (!hasSavedClinicDraft) {
           setForm({
             clinicName: clinic?.name || "", clinicEmail: clinic?.email || "", clinicPhone: clinic?.phone || "",
-            clinicCity: clinic?.city || "", clinicAddress: clinic?.address || "", contactPerson: clinic?.contactPerson || "",
+            clinicCountry: clinic?.country || "", clinicCity: clinic?.city || "", clinicAddress: clinic?.address || "", contactPerson: clinic?.contactPerson || "",
             logoUrl: clinic?.logoUrl || "", brandColor: clinic?.brandColor || "#0f172a",
             procedurePresetPrices: normalizeProcedurePresets(clinic?.procedurePresetPrices),
           });
@@ -198,7 +200,7 @@ export default function ClinicSettings() {
       clearFormDraft();
       setForm({
         clinicName: clinic?.name || "", clinicEmail: clinic?.email || "", clinicPhone: clinic?.phone || "",
-        clinicCity: clinic?.city || "", clinicAddress: clinic?.address || "", contactPerson: clinic?.contactPerson || "",
+        clinicCountry: clinic?.country || "", clinicCity: clinic?.city || "", clinicAddress: clinic?.address || "", contactPerson: clinic?.contactPerson || "",
         logoUrl: clinic?.logoUrl || "", brandColor: clinic?.brandColor || "#0f172a",
         procedurePresetPrices: normalizeProcedurePresets(clinic?.procedurePresetPrices),
       });
@@ -296,6 +298,19 @@ export default function ClinicSettings() {
                          <Input label="Clinic Name *" name="clinicName" value={form.clinicName} onChange={handleChange} required icon={Building} className="bg-white" />
                          <Input label="Clinic Email *" name="clinicEmail" type="email" value={form.clinicEmail} onChange={handleChange} required icon={Mail} className="bg-white" />
                          <Input label="Clinic Phone" name="clinicPhone" value={form.clinicPhone} onChange={handleChange} icon={Phone} className="bg-white" />
+                         <Select
+                            label="Country"
+                            name="clinicCountry"
+                            value={form.clinicCountry || ""}
+                            onChange={handleChange}
+                            icon={Globe}
+                            className="bg-white"
+                         >
+                           <option value="" disabled>Select a country</option>
+                           {COUNTRIES.map(country => (
+                             <option key={country} value={country}>{country}</option>
+                           ))}
+                         </Select>
                          <Input label="City" name="clinicCity" value={form.clinicCity} onChange={handleChange} icon={MapPin} className="bg-white" />
                          <Input label="Contact Person" name="contactPerson" value={form.contactPerson} onChange={handleChange} icon={User} className="bg-white" />
                          

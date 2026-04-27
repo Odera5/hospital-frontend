@@ -1,17 +1,20 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Building2, Phone, MapPin, Mail, Lock, User } from "lucide-react";
+import { Building2, Phone, MapPin, Mail, Lock, User, Globe } from "lucide-react";
 import api from "../services/api";
 import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
 import Button from "../components/ui/Button";
 import usePersistentState from "../hooks/usePersistentState";
 import primuxFavicon from "../assets/PrimuxCareFavicon.png";
+import { COUNTRIES } from "../constants/countries";
 
 const initialForm = {
   clinicName: "",
   clinicEmail: "",
   clinicPhone: "",
+  clinicCountry: "",
   clinicCity: "",
   clinicAddress: "",
   adminName: "",
@@ -46,6 +49,7 @@ export default function RegisterClinic() {
       clinicName: form.clinicName.trim(),
       clinicEmail: form.clinicEmail.trim(),
       clinicPhone: form.clinicPhone.trim(),
+      clinicCountry: form.clinicCountry.trim(),
       clinicCity: form.clinicCity.trim(),
       clinicAddress: form.clinicAddress.trim(),
       adminName: form.adminName.trim(),
@@ -210,15 +214,30 @@ export default function RegisterClinic() {
                   placeholder="+1 (555) 000-0000"
                 />
               </div>
-              <Input
-                label="City"
-                name="clinicCity"
-                type="text"
-                icon={MapPin}
-                value={form.clinicCity}
-                onChange={handleChange}
-                placeholder="e.g. New York"
-              />
+              <div className="grid gap-4 md:grid-cols-2">
+                <Select
+                  label="Country"
+                  name="clinicCountry"
+                  icon={Globe}
+                  value={form.clinicCountry || ""}
+                  onChange={handleChange}
+                  className="bg-white"
+                >
+                  <option value="" disabled>Select a country</option>
+                  {COUNTRIES.map(country => (
+                    <option key={country} value={country}>{country}</option>
+                  ))}
+                </Select>
+                <Input
+                  label="City"
+                  name="clinicCity"
+                  type="text"
+                  icon={MapPin}
+                  value={form.clinicCity}
+                  onChange={handleChange}
+                  placeholder="e.g. New York"
+                />
+              </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-slate-700">Clinic Address</label>
                 <textarea

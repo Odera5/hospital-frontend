@@ -27,6 +27,8 @@ const Reports = lazy(() => import("./pages/Reports"));
 const PatientIntakeForm = lazy(() => import("./pages/PatientIntakeForm"));
 const PaystackCallback = lazy(() => import("./pages/PaystackCallback"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 function RouteLoader() {
   return (
@@ -70,6 +72,8 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register-clinic" element={<RegisterClinic />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/billing/paystack/callback" element={<PaystackCallback />} />
           <Route path="/support" element={<Support />} />
           <Route path="/intake/:clinicId" element={<PatientIntakeForm />} />
