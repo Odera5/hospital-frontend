@@ -188,6 +188,11 @@ export default function UpgradePlan() {
           Scale your practice with unlimited patients, automated reminders, and
           advanced analytics designed to grow your revenue.
         </p>
+        {!hasActivePaidSubscription && (
+          <p className="mt-4 text-sm inline-flex items-center gap-2 font-medium text-primary-700 bg-primary-50 px-4 py-1.5 rounded-full border border-primary-100 shadow-sm">
+            <Crown size={16} /> New clinics get 14 days of Pro access free before paid billing starts.
+          </p>
+        )}
         {hasActivePaidSubscription && (
           <p className="mt-4 text-sm inline-flex items-center gap-2 font-medium text-emerald-700 bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-100 shadow-sm">
             <Crown size={16} /> Pro Plan Active — Next payment: {formattedNextPaymentDate || formattedRenewalDate}
@@ -288,6 +293,7 @@ export default function UpgradePlan() {
             <FeatureItem included>2 Staff Accounts</FeatureItem>
             <FeatureItem included>Manual Appointments</FeatureItem>
             <FeatureItem included>Basic Clinical Records</FeatureItem>
+            <FeatureItem missing>Automated Appointment Reminders</FeatureItem>
             <FeatureItem missing>Unlimited Storage (X-Ray Uploads)</FeatureItem>
             <FeatureItem missing>Advanced Analytics</FeatureItem>
           </div>
@@ -366,6 +372,7 @@ export default function UpgradePlan() {
             <FeatureItem included dark highlight>
               Online Patient Intake Forms
             </FeatureItem>
+            <FeatureItem included dark>Automated Appointment Reminder Emails</FeatureItem>
             <FeatureItem included dark>Everything in Starter</FeatureItem>
             <FeatureItem included dark>Custom Invoice Branding</FeatureItem>
             <FeatureItem included dark>

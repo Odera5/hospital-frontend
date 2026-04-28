@@ -216,6 +216,68 @@ export default function AppointmentSchedule({ patientId = null }) {
     return labels[type] || type;
   };
 
+  const getReminderMeta = (appointment) => {
+    if (!appointment?.reminderEnabled) {
+      if (appointment?.reminderStatus === "plan_locked") {
+        return {
+          label: "Pro locked",
+          className: "bg-amber-100 text-amber-800 border-amber-200",
+        };
+      }
+      if (appointment?.reminderStatus === "no_email") {
+        return {
+          label: "No email",
+          className: "bg-rose-100 text-rose-700 border-rose-200",
+        };
+      }
+      return null;
+    }
+
+    const statusMap = {
+      scheduled: {
+        label: "Reminder queued",
+        className: "bg-sky-100 text-sky-700 border-sky-200",
+      },
+      sent_24h: {
+        label: "24h sent",
+        className: "bg-indigo-100 text-indigo-700 border-indigo-200",
+      },
+      sent_final: {
+        label: "Final sent",
+        className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+      },
+      failed: {
+        label: "Reminder failed",
+        className: "bg-rose-100 text-rose-700 border-rose-200",
+      },
+    };
+
+    return statusMap[appointment.reminderStatus] || statusMap.scheduled;
+  };
+
+  const getConfirmationMeta = (appointment) => {
+    const statusMap = {
+      pending: {
+        label: "Pending reply",
+        className: "bg-slate-100 text-slate-700 border-slate-200",
+      },
+      confirmed: {
+        label: "Confirmed",
+        className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+      },
+      reschedule_requested: {
+        label: "Reschedule requested",
+        className: "bg-amber-100 text-amber-700 border-amber-200",
+      },
+      no_response: {
+        label: "No response",
+        className: "bg-rose-100 text-rose-700 border-rose-200",
+      },
+    };
+
+    return statusMap[appointment?.patientConfirmationStatus] || statusMap.pending;
+  };
+
   const canModifyAppointment = (status) => !["arrived", "completed", "cancelled", "no_show"].includes(status);
 
   if (showForm) {
@@ -274,7 +336,15 @@ export default function AppointmentSchedule({ patientId = null }) {
                           {apt.patientId?.name || "Unknown Patient"}
                         </h3>
                         <p className="text-xs font-semibold text-primary-600 mt-1 uppercase tracking-wider">{getTypeLabel(apt.appointmentType)}</p>
-                        {/* Reminder badge removed */}
+                        {getReminderMeta(apt) && (
+                          <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getReminderMeta(apt).className}`}>
+                            <Bell size={12} />
+                            {getReminderMeta(apt).label}
+                          </span>
+                        )}
+                        <span className={`mt-2 ml-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getConfirmationMeta(apt).className}`}>
+                          {getConfirmationMeta(apt).label}
+                        </span>
                       </div>
                       <span className={`text-[10px] font-bold px-2 py-1 rounded-full border uppercase tracking-wider ${getStatusStyle(apt.status)}`}>
                         {apt.status}

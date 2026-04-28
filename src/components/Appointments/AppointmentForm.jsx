@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { User, Calendar, Clock, MapPin, Phone, Mail, Hash, UserPlus, Save, X, Activity } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { User, Calendar, Clock, MapPin, Phone, Mail, Hash, UserPlus, Save, X, Activity, Bell, Lock, Crown } from "lucide-react";
 import api from "../../services/api";
 import Toast from "../Toast";
 import { getEntityId } from "../../utils/entityId";
@@ -11,6 +12,18 @@ import PatientPicker from "../ui/PatientPicker";
 
 export default function AppointmentForm({ patientId = null, appointment = null, onSuccess, onCancel, draftStorageKey = "primuxcare:draft:appointment-form:new" }) {
   const dentistAssignmentEnabled = false;
+  const navigate = useNavigate();
+  const storedUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user"))) || {};
+  const clinic = storedUser?.clinic || {};
+  const paystackStatus = String(clinic?.paystackSubscriptionStatus || "").toLowerCase();
+  const hasActivePaidSubscription = ["active", "attention", "success"].includes(paystackStatus);
+  const hasProReminderAccess =
+    clinic?.plan === "PRO" &&
+    (
+      hasActivePaidSubscription ||
+      !clinic?.subscriptionEnds ||
+      new Date(clinic.subscriptionEnds) >= new Date()
+    );
   const [formData, setFormData, clearFormDraft] = usePersistentState(
     `${draftStorageKey}:form`,
     appointment
@@ -22,10 +35,11 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
           duration: appointment.duration,
           notes: appointment.notes || "",
           dentistId: getEntityId(appointment.dentistId),
+          reminderEnabled: Boolean(appointment.reminderEnabled),
         }
       : {
           patientId: patientId || "", appointmentDate: "", timeSlot: "",
-          appointmentType: "checkup", duration: 30, notes: "", dentistId: "",
+          appointmentType: "checkup", duration: 30, notes: "", dentistId: "", reminderEnabled: hasProReminderAccess,
         },
   );
   const [patientMode, setPatientMode, clearPatientModeDraft] = usePersistentState(
@@ -59,6 +73,12 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
     if (formData.appointmentDate) fetchAvailableSlots();
   }, [fetchAvailableSlots, formData.appointmentDate]);
 
+  useEffect(() => {
+    if (!hasProReminderAccess && formData.reminderEnabled) {
+      setFormData((prev) => ({ ...prev, reminderEnabled: false }));
+    }
+  }, [formData.reminderEnabled, hasProReminderAccess, setFormData]);
+
   const handleChange = (e) => setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   const handleNewPatientChange = (e) => setNewPatient((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -79,11 +99,20 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
           setToast({ show: true, message: "New patient name and age are required", type: "error" });
           setLoading(false); return;
         }
+        if (formData.reminderEnabled && !newPatient.email.trim()) {
+          setToast({ show: true, message: "Patient email is required for automated reminders", type: "error" });
+          setLoading(false); return;
+        }
         const patientResponse = await api.post("/patients", newPatient);
         resolvedPatientId = getEntityId(patientResponse.data);
       }
 
-      const payload = { ...formData, patientId: resolvedPatientId, dentistId: dentistAssignmentEnabled ? formData.dentistId : "" };
+      const payload = {
+        ...formData,
+        patientId: resolvedPatientId,
+        dentistId: dentistAssignmentEnabled ? formData.dentistId : "",
+        reminderEnabled: hasProReminderAccess ? Boolean(formData.reminderEnabled) : false,
+      };
       
       let savedAppointment;
       if (appointment) savedAppointment = (await api.put(`/appointments/${getEntityId(appointment)}`, payload)).data;
@@ -199,6 +228,54 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-slate-700">Condition Notes / Reason</label>
               <textarea name="notes" value={formData.notes} onChange={handleChange} rows="3" className="w-full rounded-xl border border-slate-200 p-4 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm resize-none" placeholder="Provide any additional context for the appointment..." />
+            </div>
+
+            <div className={`rounded-2xl border p-5 ${hasProReminderAccess ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/80"}`}>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className={`rounded-xl p-3 ${hasProReminderAccess ? "bg-white text-emerald-600 border border-emerald-200" : "bg-white text-amber-600 border border-amber-200"}`}>
+                    {hasProReminderAccess ? <Bell size={18} /> : <Lock size={18} />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">
+                      Automated Appointment Reminders
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {hasProReminderAccess
+                        ? "Send automatic email reminders before the visit. Patients must have an email address on file."
+                        : "This reminder workflow is available on the paid Pro plan and during the 14-day free trial."}
+                    </p>
+                  </div>
+                </div>
+
+                {hasProReminderAccess ? (
+                  <label className="inline-flex items-center gap-3 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 border border-emerald-200 shadow-sm">
+                    <input
+                      type="checkbox"
+                      name="reminderEnabled"
+                      checked={Boolean(formData.reminderEnabled)}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          reminderEnabled: event.target.checked,
+                        }))
+                      }
+                      className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    Enable email reminders
+                  </label>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate("/upgrade")}
+                    className="w-full sm:w-auto bg-white border-amber-200 text-amber-800 hover:bg-amber-100"
+                  >
+                    <Crown size={16} className="mr-2" /> Upgrade to Pro
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-4 pt-6 mt-6 border-t border-slate-100">

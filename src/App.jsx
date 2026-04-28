@@ -28,6 +28,7 @@ const PaystackCallback = lazy(() => import("./pages/PaystackCallback"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AppointmentResponse = lazy(() => import("./pages/AppointmentResponse"));
 const DashboardLayout = lazy(() => import("./components/layout/DashboardLayout"));
 
 function RouteLoader() {
@@ -70,6 +71,7 @@ function App() {
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/appointment-response" element={<AppointmentResponse />} />
           <Route path="/billing/paystack/callback" element={<PaystackCallback />} />
           <Route path="/support" element={<Support />} />
           <Route path="/intake/:clinicId" element={<PatientIntakeForm />} />
