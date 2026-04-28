@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useDeferredValue, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
@@ -47,7 +47,7 @@ export default function Dashboard() {
   const canDeletePatients = ["admin", "doctor", "nurse"].includes(user.role);
 
   const [patients, setPatients] = useState([]);
-  const [patientsToday, setPatientsToday] = useState([]);
+  const [patientsToday, setPatientsToday] = useState(0);
   const [appointmentsToday, setAppointmentsToday] = useState(0);
   const [waitingSummary, setWaitingSummary] = useState(defaultWaitingSummary);
   const [monthlyRevenue, setMonthlyRevenue] = useState(0);
@@ -63,9 +63,12 @@ export default function Dashboard() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState(null);
+  const [patientTotal, setPatientTotal] = useState(0);
+  const [patientTotalPages, setPatientTotalPages] = useState(1);
 
   const showTrash = location.search.includes("tab=trash");
   const clinicPlan = storedUser?.clinic?.plan || "FREE";
+  const deferredSearchQuery = useDeferredValue(searchQuery.trim());
 
   const showToast = (message, type = "success") => setToast({ message, type });
 
@@ -74,31 +77,43 @@ export default function Dashboard() {
       setShowUpgradeModal(true);
       return;
     }
-    if (patients.length === 0) {
-      showToast("No patients to export", "error");
-      return;
-    }
+    const runExport = async () => {
+      try {
+        const res = await api.get("/patients");
+        const exportPatients = Array.isArray(res.data) ? res.data : [];
 
-    const csvData = patients.map((p) => ({
-      Name: p.name,
-      Age: p.age,
-      Gender: p.gender,
-      Phone: p.phone,
-      Email: p.email,
-      Address: p.address,
-      CardNumber: p.cardNumber,
-      CreatedAt: new Date(p.createdAt).toLocaleString()
-    }));
+        if (exportPatients.length === 0) {
+          showToast("No patients to export", "error");
+          return;
+        }
 
-    const csv = Papa.unparse(csvData);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `patients_export_${new Date().getTime()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast("Export successful!");
+        const csvData = exportPatients.map((p) => ({
+          Name: p.name,
+          Age: p.age,
+          Gender: p.gender,
+          Phone: p.phone,
+          Email: p.email,
+          Address: p.address,
+          CardNumber: p.cardNumber,
+          CreatedAt: new Date(p.createdAt).toLocaleString()
+        }));
+
+        const csv = Papa.unparse(csvData);
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", `patients_export_${new Date().getTime()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast("Export successful!");
+      } catch (err) {
+        console.error(err);
+        showToast("Failed to export patients", "error");
+      }
+    };
+
+    runExport();
   };
 
   const handleImportClick = () => {
@@ -113,21 +128,58 @@ export default function Dashboard() {
     setShowImportModal(false);
     showToast(`Successfully imported ${count} legacy patient records!`);
     fetchPatients();
+    fetchSummary();
   };
+
+  const fetchSummary = useCallback(async () => {
+    try {
+      const res = await api.get("/dashboard/summary");
+      const summary = res.data || {};
+      setPatientsToday(summary.patients?.today || 0);
+      setAppointmentsToday(summary.appointments?.today || 0);
+      setWaitingSummary(summary.waitingRoom || defaultWaitingSummary);
+      setMonthlyRevenue(summary.billing?.monthlyRevenue || 0);
+    } catch (err) {
+      console.error(err);
+      setPatientsToday(0);
+      setAppointmentsToday(0);
+      setWaitingSummary(defaultWaitingSummary);
+      setMonthlyRevenue(0);
+      if (!shouldSuppressDashboardError(err)) showToast("Failed to load dashboard summary", "error");
+    }
+  }, []);
 
   const fetchPatients = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get("/patients");
-      const activePatients = (res.data || []).filter((p) => p && !p.isDeleted);
-      setPatients(activePatients.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      const res = await api.get("/patients", {
+        params: {
+          page: currentPage,
+          limit: PATIENTS_PER_PAGE,
+          search: deferredSearchQuery || undefined,
+          sortBy: sortConfig.key || undefined,
+          sortDirection: sortConfig.direction || undefined,
+        },
+      });
+      const pageData = Array.isArray(res.data?.data)
+        ? res.data.data
+        : Array.isArray(res.data)
+          ? res.data
+          : [];
+
+      setPatients(pageData.filter((p) => p && !p.isDeleted));
+      setPatientTotal(Number(res.data?.total) || pageData.length);
+      setPatientTotalPages(Number(res.data?.totalPages) || 1);
     } catch (err) {
       console.error(err);
+      setPatients([]);
+      setPatientTotal(0);
+      setPatientTotalPages(1);
       showToast("Failed to load patients", "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPage, deferredSearchQuery, sortConfig.direction, sortConfig.key]);
 
   const fetchTrash = useCallback(async () => {
     if (user.role !== "admin") return;
@@ -141,66 +193,30 @@ export default function Dashboard() {
     }
   }, [user.role]);
 
-  const fetchAppointmentsToday = useCallback(async () => {
-    try {
-      const today = formatLocalDateKey();
-      const res = await api.get(`/appointments?startDate=${today}&endDate=${today}`);
-      setAppointmentsToday(res.data?.length || 0);
-    } catch (err) {
-      console.error(err);
-      setAppointmentsToday(0);
-      if (!shouldSuppressDashboardError(err)) showToast("Failed to load today's appointments", "error");
-    }
-  }, []);
-
-  const fetchWaitingSummary = useCallback(async () => {
-    try {
-      const res = await api.get("/waiting-room/summary");
-      setWaitingSummary(res.data || defaultWaitingSummary);
-    } catch (err) {
-      console.error(err);
-      setWaitingSummary(defaultWaitingSummary);
-      if (!shouldSuppressDashboardError(err)) showToast("Failed to load waiting room summary", "error");
-    }
-  }, []);
-
-  const fetchMonthlyRevenue = useCallback(async () => {
-    try {
-      const now = new Date();
-      const startDate = formatLocalDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
-      const endDate = formatLocalDateKey(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-      const res = await api.get(`/invoices/report?startDate=${startDate}&endDate=${endDate}`);
-      setMonthlyRevenue(res.data?.totalRevenue || 0);
-    } catch (err) {
-      console.error(err);
-      setMonthlyRevenue(0);
-      if (!shouldSuppressDashboardError(err)) showToast("Failed to load revenue summary", "error");
-    }
-  }, []);
+  useEffect(() => {
+    if (showTrash) return;
+    fetchPatients();
+    fetchSummary();
+  }, [fetchPatients, fetchSummary, showTrash]);
 
   useEffect(() => {
-    fetchPatients();
-    fetchTrash();
-    fetchAppointmentsToday();
-    fetchWaitingSummary();
-    fetchMonthlyRevenue();
-  }, [fetchAppointmentsToday, fetchMonthlyRevenue, fetchPatients, fetchTrash, fetchWaitingSummary]);
+    if (showTrash && user.role === "admin") {
+      fetchTrash();
+    }
+  }, [fetchTrash, showTrash, user.role]);
 
   useEffect(() => {
     if (location.state?.newPatient) {
-      setPatients((prev) => [location.state.newPatient, ...prev]);
+      fetchPatients();
+      fetchSummary();
       window.history.replaceState({}, document.title);
     }
-  }, [location.state]);
+  }, [fetchPatients, fetchSummary, location.state]);
 
   useEffect(() => {
     const today = formatLocalDateKey();
     if (today !== currentDay) setCurrentDay(today);
   }, [currentDay]);
-
-  useEffect(() => {
-    setPatientsToday(patients.filter((p) => formatLocalDateKey(p.createdAt) === currentDay));
-  }, [patients, currentDay]);
 
   const requestSort = (key) => {
     let direction = "asc";
@@ -208,27 +224,27 @@ export default function Dashboard() {
     setDirectoryState((current) => ({ ...current, sortConfig: { key, direction } }));
   };
 
-  const sortedPatients = sortConfig.key
-    ? [...patients].sort((a, b) => {
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const sortedTrash = sortConfig.key
+    ? [...trash].sort((a, b) => {
         if (!a[sortConfig.key]) return 1;
         if (!b[sortConfig.key]) return -1;
         if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === "asc" ? -1 : 1;
         if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       })
-    : [...patients];
-
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+    : [...trash];
   const matchesSearch = (patient) => {
     if (!normalizedSearchQuery) return true;
     return [patient?.name, patient?.cardNumber].filter(Boolean).map(v => String(v).toLowerCase()).some(v => v.includes(normalizedSearchQuery));
   };
 
-  const activeList = showTrash ? trash.filter(matchesSearch) : sortedPatients.filter(p => p && p.name).filter(matchesSearch);
-  const totalPages = Math.max(1, Math.ceil(activeList.length / PATIENTS_PER_PAGE));
+  const activeList = showTrash ? sortedTrash.filter(matchesSearch) : patients.filter((p) => p && p.name);
+  const totalPages = showTrash ? Math.max(1, Math.ceil(activeList.length / PATIENTS_PER_PAGE)) : Math.max(1, patientTotalPages);
   const currentPageSafe = Math.min(currentPage, totalPages);
   const pageStartIndex = (currentPageSafe - 1) * PATIENTS_PER_PAGE;
-  const paginatedPatients = activeList.slice(pageStartIndex, pageStartIndex + PATIENTS_PER_PAGE);
+  const paginatedPatients = showTrash ? activeList.slice(pageStartIndex, pageStartIndex + PATIENTS_PER_PAGE) : activeList;
+  const totalResults = showTrash ? activeList.length : patientTotal;
 
   useEffect(() => {
     setDirectoryState((current) => ({ ...current, currentPage: 1 }));
@@ -243,8 +259,9 @@ export default function Dashboard() {
     try {
       const res = await api.delete(`/patients/${patientId}`);
       if (res.status === 200) {
-        setPatients((prev) => prev.filter((patient) => getEntityId(patient) !== patientId));
+        fetchPatients();
         fetchTrash();
+        fetchSummary();
         showToast(res.data.message || "Patient moved to Trash");
       } else showToast("Failed to delete patient", "error");
     } catch (err) {
@@ -268,6 +285,7 @@ export default function Dashboard() {
       if (res.status === 200) {
         fetchPatients();
         fetchTrash();
+        fetchSummary();
         showToast("Patient restored successfully");
       }
     } catch (err) {
@@ -279,7 +297,9 @@ export default function Dashboard() {
     try {
       const res = await api.delete(`/patients/${patientId}/permanent`);
       if (res.status === 200) {
+        fetchPatients();
         fetchTrash();
+        fetchSummary();
         showToast("Patient permanently deleted");
       }
     } catch (err) {
@@ -314,7 +334,7 @@ export default function Dashboard() {
               <div className="flex justify-between items-center mt-2">
                 <div>
                   <p className="text-sm font-medium text-slate-500">Patients Today</p>
-                  <h3 className="text-3xl font-bold text-slate-900 mt-2">{patientsToday.length}</h3>
+                  <h3 className="text-3xl font-bold text-slate-900 mt-2">{patientsToday}</h3>
                 </div>
                 <div className="p-3 bg-emerald-100 rounded-xl text-emerald-600">
                   <Users size={24} />
@@ -451,7 +471,7 @@ export default function Dashboard() {
               ) : (
                 paginatedPatients.map((p) => {
                   const patientId = getEntityId(p);
-                  const isToday = patientsToday.some((todayP) => getEntityId(todayP) === patientId);
+                  const isToday = formatLocalDateKey(p.createdAt) === currentDay;
                   return (
                     <tr key={patientId} className={`hover:bg-slate-50 transition-colors ${!showTrash && isToday ? "bg-primary-50/50" : ""}`}>
                       <td className="px-6 py-4">
@@ -493,7 +513,7 @@ export default function Dashboard() {
 
         <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-surface-200 bg-surface-50 gap-4">
           <p className="text-sm text-slate-500">
-            Showing <span className="font-medium text-slate-900">{activeList.length > 0 ? pageStartIndex + 1 : 0}</span> to <span className="font-medium text-slate-900">{Math.min(pageStartIndex + PATIENTS_PER_PAGE, activeList.length)}</span> of <span className="font-medium text-slate-900">{activeList.length}</span> results
+            Showing <span className="font-medium text-slate-900">{totalResults > 0 ? pageStartIndex + 1 : 0}</span> to <span className="font-medium text-slate-900">{Math.min(pageStartIndex + PATIENTS_PER_PAGE, totalResults)}</span> of <span className="font-medium text-slate-900">{totalResults}</span> results
           </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setDirectoryState((current) => ({ ...current, currentPage: Math.max(1, current.currentPage - 1) }))} disabled={currentPageSafe <= 1}>

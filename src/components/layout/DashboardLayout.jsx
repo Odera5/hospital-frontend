@@ -143,21 +143,16 @@ export default function DashboardLayout() {
     const fetchCounts = async () => {
       if (!canViewRecords) return;
       try {
-        const resApt = await api.get(`/appointments?status=scheduled`);
-        setAppointmentCount(resApt.data.length || 0);
-
-        const resWait = await api.get(`/waiting-room`);
-        const activeWaiting = (resWait.data || []).filter(
-          (item) => item.status === "waiting" || item.status === "called",
-        );
-        setWaitingCount(activeWaiting.length);
+        const response = await api.get("/dashboard/summary");
+        setAppointmentCount(response.data?.appointments?.scheduled || 0);
+        setWaitingCount(response.data?.waitingRoom?.active || 0);
       } catch {
         // ignore for badges
       }
     };
 
     fetchCounts();
-    const intervalId = setInterval(fetchCounts, 15000);
+    const intervalId = setInterval(fetchCounts, 30000);
     return () => clearInterval(intervalId);
   }, [location.pathname, canViewRecords]);
 
