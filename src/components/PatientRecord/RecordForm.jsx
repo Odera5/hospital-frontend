@@ -159,11 +159,11 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (!recordData.consentObtained) {
-      alert("Informed consent must be obtained and documented before saving the record.");
+      setNotificationModal({ show: true, message: "Informed consent must be obtained and documented before saving the record." });
       return;
     }
     if (!recordData.consentDate || !recordData.consentTakenBy?.trim()) {
-      alert("Please provide the consent date and the clinician who took the consent.");
+      setNotificationModal({ show: true, message: "Please provide the consent date and the clinician who took the consent." });
       return;
     }
     onSubmit(e);
@@ -174,6 +174,7 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
   const [activeTemplateType, setActiveTemplateType] = useState(null);
   const [templateCategory, setTemplateCategory] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [notificationModal, setNotificationModal] = useState({ show: false, message: "" });
 
   const storedUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user"))) || {};
   const clinicPlan = storedUser?.clinic?.plan || "FREE";
@@ -242,7 +243,7 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
       if (err.response?.status === 403 || err.response?.data?.errorCode === 'UPGRADE_REQUIRED') {
          setShowUpgradeModal(true);
       } else {
-         alert("Failed to upload some files. " + (err.response?.data?.message || err.message));
+         setNotificationModal({ show: true, message: "Failed to upload some files. " + (err.response?.data?.message || err.message) });
       }
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -686,6 +687,23 @@ export default function RecordForm({ recordData, setRecordData, onSubmit, submit
                   })}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notificationModal.show && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setNotificationModal({ show: false, message: "" })}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 border border-slate-200 text-center flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+              <AlertCircle size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Notice</h3>
+            <p className="text-slate-500 text-sm mb-6">
+              {notificationModal.message}
+            </p>
+            <div className="flex w-full justify-center">
+              <Button type="button" className="w-full bg-primary-600 text-white" onClick={() => setNotificationModal({ show: false, message: "" })}>Acknowledge</Button>
             </div>
           </div>
         </div>

@@ -24,7 +24,7 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
   const formatWithCommas = (text) => {
     if (!text) return text;
     return text.split('\n')
-      .map(s => s.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, '').replace(/\.$/, '').trim())
+      .map(s => s.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, '').trim().replace(/\.+$/, '').trim())
       .filter(Boolean)
       .join(', ');
   };
@@ -76,7 +76,7 @@ function RecordItem({ record, expandedRecordId, setExpandedRecordId, handleDelet
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-3">
              <span className="inline-flex items-center text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full"><Calendar size={12} className="mr-1.5" /> {record.createdAt ? new Date(record.createdAt).toLocaleDateString() : "-"}</span>
-             <h3 className="font-bold text-slate-900 text-lg flex items-center"><Activity size={16} className="mr-2 text-rose-500" /> <HighlightText text={record.diagnosis || "No Diagnosis Recorded"} keyword={searchKeyword} /></h3>
+             <h3 className="font-bold text-slate-900 text-lg flex items-center"><Activity size={16} className="mr-2 text-rose-500" /> <HighlightText text={formatWithCommas(record.diagnosis) || "No Diagnosis Recorded"} keyword={searchKeyword} /></h3>
           </div>
           <p className="text-sm text-slate-600 line-clamp-1"><strong className="text-slate-800">C/O:</strong> <HighlightText text={formatWithCommas(record.presentingComplaint) || "N/A"} keyword={searchKeyword} /></p>
         </div>
