@@ -23,6 +23,7 @@ const WaitingRoom = lazy(() => import("./pages/WaitingRoom"));
 const Support = lazy(() => import("./pages/Support"));
 const UpgradePlan = lazy(() => import("./pages/UpgradePlan"));
 const Reports = lazy(() => import("./pages/Reports"));
+const PendingIntakes = lazy(() => import("./pages/PendingIntakes"));
 const PatientIntakeForm = lazy(() => import("./pages/PatientIntakeForm"));
 const PaystackCallback = lazy(() => import("./pages/PaystackCallback"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
@@ -82,6 +83,7 @@ function App() {
             <Route path="/register-patient" element={<RegisterPatient />} />
             <Route path="/appointments" element={<Appointments />} />
             <Route path="/waiting-room" element={<WaitingRoom />} />
+            <Route path="/pending-intakes" element={<PendingIntakes />} />
             <Route path="/billing" element={<Billing />} />
             <Route
               path="/upgrade"

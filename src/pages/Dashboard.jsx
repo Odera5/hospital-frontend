@@ -191,7 +191,7 @@ export default function Dashboard() {
           limit: PATIENTS_PER_PAGE,
           search: deferredSearchQuery || undefined,
           sortBy: sortConfig.key || undefined,
-          sortDirection: sortConfig.direction || undefined,
+          sortDirection: sortConfig.key ? sortConfig.direction : "desc",
         },
       });
       const pageData = Array.isArray(res.data?.data)

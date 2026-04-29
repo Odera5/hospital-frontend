@@ -82,6 +82,22 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
   const handleChange = (e) => setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   const handleNewPatientChange = (e) => setNewPatient((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
+  const formatSelectedDateLabel = (value) => {
+    if (!value) return "selected date";
+
+    const parsedDate = new Date(value);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "selected date";
+    }
+
+    return parsedDate.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -206,7 +222,15 @@ export default function AppointmentForm({ patientId = null, appointment = null, 
                     {slotLoading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-slate-400 border-t-transparent" /> : <Clock size={18} className="text-slate-400" />}
                   </div>
                   <select name="timeSlot" value={formData.timeSlot} onChange={handleChange} required disabled={!formData.appointmentDate || slotLoading || availableSlots.length === 0} className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none h-[46px] shadow-sm disabled:bg-slate-50">
-                    <option value="">{!formData.appointmentDate ? "Select date first" : slotLoading ? "Loading..." : availableSlots.length === 0 ? "No free times" : "Select Time"}</option>
+                    <option value="">
+                      {!formData.appointmentDate
+                        ? "Select date first"
+                        : slotLoading
+                          ? "Loading..."
+                          : availableSlots.length === 0
+                            ? "No free times"
+                            : `Time available for ${formatSelectedDateLabel(formData.appointmentDate)}`}
+                    </option>
                     {availableSlots.map((slot) => (<option key={slot} value={slot}>{slot}</option>))}
                   </select>
                 </div>

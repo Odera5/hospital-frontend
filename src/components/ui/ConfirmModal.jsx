@@ -11,7 +11,9 @@ export default function ConfirmModal({
   message = "Are you sure you want to proceed?", 
   confirmText = "Confirm", 
   cancelText = "Cancel",
-  danger = false
+  danger = false,
+  confirmLoading = false,
+  closeOnConfirm = true,
 }) {
   return (
     <AnimatePresence>
@@ -24,7 +26,11 @@ export default function ConfirmModal({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-            onClick={onClose}
+            onClick={() => {
+              if (!confirmLoading) {
+                onClose();
+              }
+            }}
           />
           
           {/* Modal */}
@@ -45,6 +51,7 @@ export default function ConfirmModal({
                 </div>
                 <button 
                   onClick={onClose}
+                  disabled={confirmLoading}
                   className="text-slate-400 hover:text-slate-600 transition-colors p-1 focus:outline-none"
                 >
                   <X size={20} />
@@ -58,14 +65,22 @@ export default function ConfirmModal({
             </div>
             
             <div className="bg-slate-50 px-6 py-4 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-slate-100">
-              <Button variant="outline" className="w-full sm:w-auto bg-white" onClick={onClose}>
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto bg-white"
+                onClick={onClose}
+                disabled={confirmLoading}
+              >
                 {cancelText}
               </Button>
               <Button 
                 className={`w-full sm:w-auto shadow-sm ${danger ? 'bg-red-600 hover:bg-red-700 text-white border-red-600' : ''}`}
+                isLoading={confirmLoading}
                 onClick={() => {
                   onConfirm();
-                  onClose();
+                  if (closeOnConfirm) {
+                    onClose();
+                  }
                 }}
               >
                 {confirmText}

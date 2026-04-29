@@ -15,6 +15,7 @@ import {
   Settings,
   Crown,
   BarChart3,
+  Inbox
 } from "lucide-react";
 import { logoutCurrentUser } from "../../services/api";
 import {
@@ -81,6 +82,9 @@ export default function DashboardLayout() {
   );
   const [waitingCount, setWaitingCount] = useState(
     cachedSummary?.waitingRoom?.active || 0,
+  );
+  const [pendingIntakesCount, setPendingIntakesCount] = useState(
+    cachedSummary?.intakes?.pending || 0,
   );
   const [showTrialBanner, setShowTrialBanner] = useState(false);
 
@@ -149,6 +153,7 @@ export default function DashboardLayout() {
   const applySummary = (summary = {}) => {
     setAppointmentCount(summary?.appointments?.scheduled || 0);
     setWaitingCount(summary?.waitingRoom?.active || 0);
+    setPendingIntakesCount(summary?.intakes?.pending || 0);
   };
 
   useEffect(() => {
@@ -220,6 +225,8 @@ export default function DashboardLayout() {
   else if (location.pathname.includes("/upgrade")) headerTitle = "Upgrade Plan";
   else if (location.pathname.includes("/reports"))
     headerTitle = "Advanced Analytics";
+  else if (location.pathname.includes("/pending-intakes"))
+    headerTitle = "Pending Intakes";
 
   if (location.search.includes("tab=trash")) headerTitle = "Trash Management";
 
@@ -284,6 +291,14 @@ export default function DashboardLayout() {
                   icon={UserPlus}
                   label="Register Patient"
                   path="/register-patient"
+                  location={location}
+                  onNavigate={handleNavClick}
+                />
+                <NavItem
+                  icon={Inbox}
+                  label="Pending Intakes"
+                  path="/pending-intakes"
+                  badge={pendingIntakesCount}
                   location={location}
                   onNavigate={handleNavClick}
                 />

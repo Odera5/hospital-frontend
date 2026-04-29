@@ -40,6 +40,7 @@ export default function ClinicSettings() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [intakeUpdating, setIntakeUpdating] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [confirmConfig, setConfirmConfig] = useState(null);
   const [editingPresets, setEditingPresets] = useState({});
@@ -102,9 +103,14 @@ export default function ClinicSettings() {
   };
   
   const storedUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user")) || "null");
-  const currentClinic = billingInfo || storedUser?.clinic || null;
+  const currentClinic = {
+    ...(storedUser?.clinic || {}),
+    ...(billingInfo || {}),
+  };
   const isPro = currentClinic?.plan === "PRO" || currentClinic?.plan === "ENTERPRISE_AI";
-  const intakeUrl = `${window.location.origin}/intake/${storedUser?.clinic?.id}`;
+  const intakeUrl = currentClinic?.intakePublicToken
+    ? `${window.location.origin}/intake/${storedUser?.clinic?.id}?access=${currentClinic.intakePublicToken}`
+    : "";
 
   const syncStoredClinic = (clinicPatch) => {
     [localStorage, sessionStorage].forEach((storage) => {
@@ -132,10 +138,51 @@ export default function ClinicSettings() {
   };
 
   const handleCopyLink = () => {
+    if (!intakeUrl) {
+      setToast({ show: true, message: "Generate or enable a secure intake link first", type: "error" });
+      return;
+    }
     navigator.clipboard.writeText(intakeUrl);
     setCopied(true);
     setToast({ show: true, message: "Intake link copied to clipboard", type: "success" });
     setTimeout(() => setCopied(false), 3000);
+  };
+
+  const updateIntakeClinicState = (clinic) => {
+    setBillingInfo((current) => ({ ...(current || {}), ...clinic }));
+    syncStoredClinic(clinic);
+  };
+
+  const handleToggleIntakeAccess = async (nextEnabled) => {
+    try {
+      setIntakeUpdating(true);
+      const response = await api.put("/auth/clinic-profile/intake-link", {
+        intakeEnabled: nextEnabled,
+      });
+      updateIntakeClinicState(response.data?.clinic || {});
+      setToast({
+        show: true,
+        message: response.data?.message || (nextEnabled ? "Patient intake enabled" : "Patient intake disabled"),
+        type: "success",
+      });
+    } catch (err) {
+      setToast({ show: true, message: err.response?.data?.message || "Failed to update intake link access", type: "error" });
+    } finally {
+      setIntakeUpdating(false);
+    }
+  };
+
+  const handleRegenerateIntakeLink = async () => {
+    try {
+      setIntakeUpdating(true);
+      const response = await api.post("/auth/clinic-profile/intake-link/regenerate");
+      updateIntakeClinicState(response.data?.clinic || {});
+      setToast({ show: true, message: response.data?.message || "Patient intake link regenerated", type: "success" });
+    } catch (err) {
+      setToast({ show: true, message: err.response?.data?.message || "Failed to regenerate intake link", type: "error" });
+    } finally {
+      setIntakeUpdating(false);
+    }
   };
 
   useEffect(() => {
@@ -150,7 +197,11 @@ export default function ClinicSettings() {
           api.get("/billing"),
         ]);
         const clinic = profileResponse.data?.clinic;
-        setBillingInfo(billingResponse.data?.clinic || null);
+        setBillingInfo({
+          ...(billingResponse.data?.clinic || {}),
+          intakeEnabled: clinic?.intakeEnabled || false,
+          intakePublicToken: clinic?.intakePublicToken || null,
+        });
         if (!hasSavedClinicDraft) {
           setForm({
             clinicName: clinic?.name || "", clinicEmail: clinic?.email || "", clinicPhone: clinic?.phone || "",
@@ -196,7 +247,6 @@ export default function ClinicSettings() {
     
     if (section === "profile") {
       payload.brandColor = billingInfo?.brandColor || "#0f172a";
-      payload.logoUrl = billingInfo?.logoUrl || "";
       payload.procedurePresetPrices = billingInfo?.procedurePresetPrices ? normalizeProcedurePresets(billingInfo.procedurePresetPrices) : payload.procedurePresetPrices;
     } else if (section === "branding") {
       payload.clinicName = billingInfo?.name || payload.clinicName;
@@ -233,7 +283,8 @@ export default function ClinicSettings() {
           clinicCountry: clinic.country || "",
           clinicCity: clinic.city || "",
           clinicAddress: clinic.address || "",
-          contactPerson: clinic.contactPerson || ""
+          contactPerson: clinic.contactPerson || "",
+          logoUrl: clinic.logoUrl || ""
         }));
       } else if (section === "branding") {
         setForm(c => ({
@@ -440,16 +491,37 @@ export default function ClinicSettings() {
                     </div>
                     
                     <div className={`mt-4 ${!isPro ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                       <div className="mb-4 flex flex-wrap items-center gap-3">
+                          <Button
+                            variant={currentClinic?.intakeEnabled ? "outline" : "primary"}
+                            onClick={() => handleToggleIntakeAccess(!currentClinic?.intakeEnabled)}
+                            isLoading={intakeUpdating}
+                            className={currentClinic?.intakeEnabled ? "w-full sm:w-auto bg-white" : "w-full sm:w-auto"}
+                          >
+                            {currentClinic?.intakeEnabled ? "Disable Link" : "Enable Link"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={handleRegenerateIntakeLink}
+                            isLoading={intakeUpdating}
+                            className="w-full sm:w-auto bg-white"
+                          >
+                            Regenerate Link
+                          </Button>
+                          <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg border ${currentClinic?.intakeEnabled ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
+                            {currentClinic?.intakeEnabled ? "Link Active" : "Link Disabled"}
+                          </span>
+                       </div>
                        <div className="grid grid-cols-[1fr_auto] gap-2 w-full">
                           <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 font-mono truncate select-all flex items-center">
-                             {intakeUrl}
+                             {intakeUrl || "Generate a secure intake link to share with patients"}
                           </div>
-                          <Button variant="outline" onClick={handleCopyLink} className="h-full px-4 bg-white shadow-sm border-slate-300 whitespace-nowrap">
+                          <Button variant="outline" onClick={handleCopyLink} disabled={!intakeUrl || !currentClinic?.intakeEnabled} className="h-full px-4 bg-white shadow-sm border-slate-300 whitespace-nowrap">
                              {copied ? <CheckCircle size={18} className="text-emerald-500 mr-2" /> : <Copy size={18} className="mr-2" />}
                              {copied ? "Copied" : "Copy"}
                           </Button>
                        </div>
-                       <p className="text-xs text-slate-400 mt-3">Link connects directly to your secure patient directory.</p>
+                       <p className="text-xs text-slate-400 mt-3">Only patients with this secure tokenized link can open the intake form. Regenerating the link immediately revokes the old one.</p>
                     </div>
 
                     {!isPro && (
