@@ -8,6 +8,7 @@ const IGNORED_PREFIXES = [
   "/verify-email",
   "/support",
   "/billing/paystack/callback",
+  "/appointment-response",
   "/intake/",
   "/waitlist",
   "/forgot-password",

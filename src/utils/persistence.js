@@ -9,6 +9,8 @@ const INVALID_LAST_ROUTE_PREFIXES = [
   "/verify-email",
   "/support",
   "/billing/paystack/callback",
+  "/appointment-response",
+  "/intake/",
   "/forgot-password",
   "/reset-password",
   "/waitlist",
