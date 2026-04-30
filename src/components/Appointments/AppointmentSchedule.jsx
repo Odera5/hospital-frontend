@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Calendar as CalendarIcon, Clock, User, FileText, CheckCircle, Trash2, Edit2, Plus, AlertCircle, Bell } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, User, FileText, CheckCircle, Trash2, Edit2, Plus, AlertCircle, Bell, RefreshCcw } from "lucide-react";
 import api from "../../services/api";
 import {
   getDashboardSummary,
@@ -278,6 +278,16 @@ export default function AppointmentSchedule({ patientId = null }) {
     return statusMap[appointment?.patientConfirmationStatus] || statusMap.pending;
   };
 
+  const formatRequestedRescheduleDate = (value) => {
+    if (!value) return "";
+    return new Date(value).toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   const canModifyAppointment = (status) => !["arrived", "completed", "cancelled", "no_show"].includes(status);
 
   if (showForm) {
@@ -351,22 +361,43 @@ export default function AppointmentSchedule({ patientId = null }) {
                       </span>
                     </div>
 
-                    <div className="space-y-2 mt-auto">
-                      <div className="flex items-center text-sm text-slate-600 font-medium">
-                        <CalendarIcon size={16} className="mr-3 text-slate-400 shrink-0" />
-                        {new Date(apt.appointmentDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      <div className="space-y-2 mt-auto">
+                        <div className="flex items-center text-sm text-slate-600 font-medium">
+                          <CalendarIcon size={16} className="mr-3 text-slate-400 shrink-0" />
+                          {new Date(apt.appointmentDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                       </div>
                       <div className="flex items-center text-sm text-slate-600">
                         <Clock size={16} className="mr-3 text-slate-400 shrink-0" />
                         {apt.timeSlot} <span className="text-slate-400 ml-1">({apt.duration} min)</span>
                       </div>
-                      {apt.notes && (
-                        <div className="flex items-start text-sm text-slate-600 mt-2">
-                          <FileText size={16} className="mr-3 text-slate-400 mt-0.5 shrink-0" />
-                          <p className="line-clamp-2 text-xs italic bg-slate-50 p-2 rounded-lg w-full border border-slate-100">{apt.notes}</p>
-                        </div>
-                      )}
-                    </div>
+                        {apt.notes && (
+                          <div className="flex items-start text-sm text-slate-600 mt-2">
+                            <FileText size={16} className="mr-3 text-slate-400 mt-0.5 shrink-0" />
+                            <p className="line-clamp-2 text-xs italic bg-slate-50 p-2 rounded-lg w-full border border-slate-100">{apt.notes}</p>
+                          </div>
+                        )}
+                        {apt.patientConfirmationStatus === "reschedule_requested" && (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                            <div className="flex items-start gap-2">
+                              <RefreshCcw size={16} className="mt-0.5 shrink-0 text-amber-700" />
+                              <div className="space-y-1">
+                                <p className="font-semibold">Patient requested a new appointment time</p>
+                                <p className="text-xs">
+                                  Preferred date: {formatRequestedRescheduleDate(apt.patientRequestedRescheduleDate) || "Not provided"}
+                                </p>
+                                <p className="text-xs">
+                                  Preferred time: {apt.patientRequestedRescheduleTime || "Not provided"}
+                                </p>
+                                {apt.patientRequestedRescheduleNote && (
+                                  <p className="text-xs italic text-amber-800">
+                                    Note: {apt.patientRequestedRescheduleNote}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
                     {/* Touch devices & Hover state actions */}
                     <div className="flex items-center gap-2 pt-4 mt-2 border-t border-slate-100 lg:opacity-0 group-hover:opacity-100 transition-opacity duration-200">

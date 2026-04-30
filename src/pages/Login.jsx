@@ -12,15 +12,16 @@ import primuxFavicon from "../assets/PrimuxCareFavicon.png";
 export default function Login() {
   const [loginDraft, setLoginDraft, clearLoginDraft] = usePersistentState(
     "primuxcare:draft:login",
-    { email: "", password: "", rememberMe: false },
+    { email: "", rememberMe: false },
   );
+  const [password, setPassword] = useState("");
   const [error, setError] = usePersistentState("primuxcare:draft:login:error", "");
   const [success, setSuccess] = usePersistentState("primuxcare:draft:login:success", "");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { email, password, rememberMe } = loginDraft;
+  const { email, rememberMe } = loginDraft;
 
   React.useEffect(() => {
     if (location.state?.successMessage) {
@@ -52,6 +53,7 @@ export default function Login() {
       storage.setItem("refreshToken", refreshToken);
       storage.setItem("user", JSON.stringify(user));
       clearLoginDraft();
+      setPassword("");
       setError("");
       setSuccess("");
 
@@ -192,7 +194,7 @@ export default function Login() {
               type="password"
               icon={Lock}
               value={password}
-              onChange={(e) => setLoginDraft((current) => ({ ...current, password: e.target.value }))}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
             />

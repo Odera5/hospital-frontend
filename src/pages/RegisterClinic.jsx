@@ -19,7 +19,6 @@ const initialForm = {
   clinicAddress: "",
   adminName: "",
   adminEmail: "",
-  password: "",
 };
 
 export default function RegisterClinic() {
@@ -29,6 +28,7 @@ export default function RegisterClinic() {
     "primuxcare:draft:register-clinic",
     initialForm,
   );
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -54,6 +54,7 @@ export default function RegisterClinic() {
       clinicAddress: form.clinicAddress.trim(),
       adminName: form.adminName.trim(),
       adminEmail: form.adminEmail.trim(),
+      password: password.trim(),
     };
 
     if (
@@ -61,7 +62,7 @@ export default function RegisterClinic() {
       !payload.clinicEmail ||
       !payload.adminName ||
       !payload.adminEmail ||
-      !form.password.trim()
+      !password.trim()
     ) {
       setError(
         "Clinic name, clinic email, admin name, admin email, and password are required.",
@@ -75,6 +76,7 @@ export default function RegisterClinic() {
       const successMessage = response.data?.message ||
           "Clinic registered successfully. Please check the admin email inbox to confirm the address and activate the account.";
       clearFormDraft();
+      setPassword("");
       navigate("/login", { state: { successMessage } });
     } catch (err) {
       const responseData = err.response?.data;
@@ -281,8 +283,8 @@ export default function RegisterClinic() {
                 name="password"
                 type="password"
                 icon={Lock}
-                value={form.password}
-                onChange={handleChange}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
                 placeholder="••••••••"
                 required
               />

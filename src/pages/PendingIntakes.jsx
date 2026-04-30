@@ -13,8 +13,81 @@ export default function PendingIntakes() {
   const [processing, setProcessing] = useState(null); // ID of intake being processed
   const [toast, setToast] = useState(null);
   const [pendingRejectIntake, setPendingRejectIntake] = useState(null);
+  const [approvalDrafts, setApprovalDrafts] = useState({});
+  const [availableSlotsByIntake, setAvailableSlotsByIntake] = useState({});
+  const [slotLoadingByIntake, setSlotLoadingByIntake] = useState({});
 
   const showToast = (message, type = "success") => setToast({ message, type });
+  const createApprovalDraft = (intake) => ({
+    assignedDate: intake.preferredDate
+      ? new Date(intake.preferredDate).toISOString().split("T")[0]
+      : "",
+    assignedTime: intake.preferredTime || "",
+  });
+
+  const syncApprovalDrafts = (items) => {
+    setApprovalDrafts((current) => {
+      const next = {};
+
+      items.forEach((intake) => {
+        next[intake.id] = current[intake.id] || createApprovalDraft(intake);
+      });
+
+      return next;
+    });
+  };
+
+  const loadAvailableSlots = async (intakeId, date, preferredTime = "") => {
+    if (!date) {
+      setAvailableSlotsByIntake((current) => ({ ...current, [intakeId]: [] }));
+      setApprovalDrafts((current) => ({
+        ...current,
+        [intakeId]: {
+          ...(current[intakeId] || {}),
+          assignedTime: "",
+        },
+      }));
+      return;
+    }
+
+    try {
+      setSlotLoadingByIntake((current) => ({ ...current, [intakeId]: true }));
+      const response = await api.get(
+        `/appointments/available-slots?date=${encodeURIComponent(date)}&duration=30`,
+      );
+      const nextSlots = response.data?.availableSlots || [];
+
+      setAvailableSlotsByIntake((current) => ({
+        ...current,
+        [intakeId]: nextSlots,
+      }));
+      setApprovalDrafts((current) => {
+        const currentDraft = current[intakeId] || {};
+        const nextAssignedTime = nextSlots.includes(currentDraft.assignedTime)
+          ? currentDraft.assignedTime
+          : nextSlots.includes(preferredTime)
+            ? preferredTime
+            : "";
+
+        return {
+          ...current,
+          [intakeId]: {
+            ...currentDraft,
+            assignedDate: date,
+            assignedTime: nextAssignedTime,
+          },
+        };
+      });
+    } catch (error) {
+      setAvailableSlotsByIntake((current) => ({ ...current, [intakeId]: [] }));
+      showToast(
+        error.response?.data?.message || "Failed to load available appointment slots",
+        "error",
+      );
+    } finally {
+      setSlotLoadingByIntake((current) => ({ ...current, [intakeId]: false }));
+    }
+  };
 
   useEffect(() => {
     fetchIntakes();
@@ -25,6 +98,13 @@ export default function PendingIntakes() {
       setLoading(true);
       const res = await api.get("/pending-intakes");
       setIntakes(res.data);
+      syncApprovalDrafts(res.data);
+      res.data.forEach((intake) => {
+        const draft = createApprovalDraft(intake);
+        if (draft.assignedDate) {
+          loadAvailableSlots(intake.id, draft.assignedDate, draft.assignedTime);
+        }
+      });
     } catch (error) {
       console.error("Failed to fetch pending intakes", error);
     } finally {
@@ -35,11 +115,22 @@ export default function PendingIntakes() {
   const handleApprove = async (intake) => {
     setProcessing(intake.id);
     try {
+      const draft = approvalDrafts[intake.id] || createApprovalDraft(intake);
       await api.post(`/pending-intakes/${intake.id}/approve`, {
-        assignedDate: intake.preferredDate,
-        assignedTime: intake.preferredTime
+        assignedDate: draft.assignedDate,
+        assignedTime: draft.assignedTime,
       });
       setIntakes(intakes.filter(i => i.id !== intake.id));
+      setApprovalDrafts((current) => {
+        const next = { ...current };
+        delete next[intake.id];
+        return next;
+      });
+      setAvailableSlotsByIntake((current) => {
+        const next = { ...current };
+        delete next[intake.id];
+        return next;
+      });
       showToast(`${intake.name} has been approved and registered!`, "success");
     } catch (error) {
       showToast(error.response?.data?.message || "Failed to approve intake", "error");
@@ -125,12 +216,20 @@ export default function PendingIntakes() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <AnimatePresence>
-            {filteredIntakes.map(intake => (
-              <motion.div
-                key={intake.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+            {filteredIntakes.map((intake) => {
+              const approvalDraft = approvalDrafts[intake.id] || createApprovalDraft(intake);
+              const availableSlots = availableSlotsByIntake[intake.id] || [];
+              const slotLoading = Boolean(slotLoadingByIntake[intake.id]);
+              const hasPartialAssignment =
+                (approvalDraft.assignedDate && !approvalDraft.assignedTime) ||
+                (!approvalDraft.assignedDate && approvalDraft.assignedTime);
+
+              return (
+                <motion.div
+                  key={intake.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
                 className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
               >
                 <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-start">
@@ -166,9 +265,9 @@ export default function PendingIntakes() {
                       </div>
                    </div>
 
-                   <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Preferred Appointment</h4>
-                      {intake.preferredDate ? (
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Preferred Appointment</h4>
+                       {intake.preferredDate ? (
                         <>
                            <div className="flex items-center gap-2 text-slate-800 font-medium mb-1.5">
                              <Calendar size={16} className="text-primary-500"/>
@@ -182,11 +281,80 @@ export default function PendingIntakes() {
                       ) : (
                         <p className="text-slate-500 italic">No preference selected</p>
                       )}
-                   </div>
-                </div>
+                    </div>
+                 </div>
 
-                <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
-                  <Button 
+                 <div className="px-5 pb-5">
+                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                       Assign Appointment
+                     </h4>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                       <div className="space-y-1.5">
+                         <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                           Date
+                         </label>
+                         <input
+                           type="date"
+                           value={approvalDraft.assignedDate}
+                           onChange={(event) => {
+                             const nextDate = event.target.value;
+                             setApprovalDrafts((current) => ({
+                               ...current,
+                               [intake.id]: {
+                                 ...(current[intake.id] || createApprovalDraft(intake)),
+                                 assignedDate: nextDate,
+                                 assignedTime: "",
+                               },
+                             }));
+                             loadAvailableSlots(intake.id, nextDate, intake.preferredTime || "");
+                           }}
+                           className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                         />
+                       </div>
+                       <div className="space-y-1.5">
+                         <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                           Time
+                         </label>
+                         <select
+                           value={approvalDraft.assignedTime}
+                           onChange={(event) =>
+                             setApprovalDrafts((current) => ({
+                               ...current,
+                               [intake.id]: {
+                                 ...(current[intake.id] || createApprovalDraft(intake)),
+                                 assignedTime: event.target.value,
+                               },
+                             }))
+                           }
+                           disabled={!approvalDraft.assignedDate || slotLoading || availableSlots.length === 0}
+                           className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-slate-100 disabled:text-slate-400"
+                         >
+                           <option value="">
+                             {!approvalDraft.assignedDate
+                               ? "Select a date first"
+                               : slotLoading
+                                 ? "Loading available times..."
+                                 : availableSlots.length === 0
+                                   ? "No free times"
+                                   : "Select a time"}
+                           </option>
+                           {availableSlots.map((slot) => (
+                             <option key={slot} value={slot}>
+                               {slot}
+                             </option>
+                           ))}
+                         </select>
+                       </div>
+                     </div>
+                     <p className="mt-3 text-xs text-slate-500">
+                       Leave both fields blank if you only want to register the patient for now without booking a slot yet.
+                     </p>
+                   </div>
+                 </div>
+
+                 <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+                   <Button 
                     className="flex-1" 
                     variant="outline" 
                     onClick={() => setPendingRejectIntake(intake)}
@@ -194,16 +362,18 @@ export default function PendingIntakes() {
                   >
                      <X size={16} className="mr-2" /> Decline
                   </Button>
-                  <Button 
-                    className="flex-1 bg-primary-600 hover:bg-primary-700 text-white shadow-sm"
-                    onClick={() => handleApprove(intake)}
-                    isLoading={processing === intake.id}
-                  >
-                     <Check size={16} className="mr-2" /> Approve & Register
-                  </Button>
-                </div>
-              </motion.div>
-            ))}
+                   <Button 
+                     className="flex-1 bg-primary-600 hover:bg-primary-700 text-white shadow-sm"
+                     onClick={() => handleApprove(intake)}
+                     disabled={hasPartialAssignment}
+                     isLoading={processing === intake.id}
+                   >
+                      <Check size={16} className="mr-2" /> Approve & Register
+                   </Button>
+                  </div>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       )}

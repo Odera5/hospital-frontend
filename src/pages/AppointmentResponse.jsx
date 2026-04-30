@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { CheckCircle2, CalendarClock, RefreshCcw, AlertCircle } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { CheckCircle2, CalendarClock, RefreshCcw, AlertCircle, MessageSquareMore } from "lucide-react";
 import api from "../services/api";
 import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
 
 const actionMeta = {
   confirm: {
@@ -12,7 +13,7 @@ const actionMeta = {
   },
   reschedule: {
     title: "Request reschedule",
-    button: "Request Reschedule",
+    button: "Send Reschedule Request",
     icon: RefreshCcw,
   },
 };
@@ -21,19 +22,36 @@ export default function AppointmentResponse() {
   const [params] = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
+  const [form, setForm] = useState({
+    preferredDate: "",
+    preferredTime: "",
+    preferredNote: "",
+  });
 
   const token = params.get("token") || "";
   const action = params.get("action") || "confirm";
+  const isRescheduleAction = action === "reschedule";
+  const isRescheduleReady = Boolean(
+    form.preferredDate.trim() && form.preferredTime.trim(),
+  );
   const meta = useMemo(() => actionMeta[action] || actionMeta.confirm, [action]);
   const Icon = meta.icon;
 
   const submitResponse = async () => {
     try {
       setSubmitting(true);
-      const response = await api.post("/appointments/respond", {
+      const payload = {
         token,
         action,
-      });
+      };
+
+      if (isRescheduleAction) {
+        payload.preferredDate = form.preferredDate;
+        payload.preferredTime = form.preferredTime;
+        payload.preferredNote = form.preferredNote;
+      }
+
+      const response = await api.post("/appointments/respond", payload);
       setResult({
         type: "success",
         message:
@@ -52,6 +70,14 @@ export default function AppointmentResponse() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleFormChange = (event) => {
+    const { name, value } = event.target;
+    setForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
   };
 
   return (
@@ -94,13 +120,63 @@ export default function AppointmentResponse() {
         ) : (
           <>
             <p className="mb-6 text-sm leading-relaxed text-slate-600">
-              Use the button below to tell the clinic whether you will attend
-              this appointment or need a different time.
+              {isRescheduleAction
+                ? "Tell the clinic which date and time would suit you better. The clinic staff will review your request before changing the appointment."
+                : "Use the button below to tell the clinic that you will attend this appointment."}
             </p>
 
             {!token ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
                 This response link is missing its token and cannot be used.
+              </div>
+            ) : isRescheduleAction ? (
+              <div className="space-y-5">
+                <Input
+                  type="date"
+                  name="preferredDate"
+                  label="Preferred new date"
+                  value={form.preferredDate}
+                  onChange={handleFormChange}
+                  min={new Date().toISOString().split("T")[0]}
+                  required
+                />
+                <Input
+                  type="time"
+                  name="preferredTime"
+                  label="Preferred new time"
+                  value={form.preferredTime}
+                  onChange={handleFormChange}
+                  required
+                />
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Note for the clinic (optional)
+                  </label>
+                  <div className="relative">
+                    <MessageSquareMore
+                      size={18}
+                      className="pointer-events-none absolute left-3 top-3.5 text-slate-400"
+                    />
+                    <textarea
+                      name="preferredNote"
+                      value={form.preferredNote}
+                      onChange={handleFormChange}
+                      rows="4"
+                      maxLength={500}
+                      className="w-full rounded-xl border border-surface-200 bg-white py-3 pl-10 pr-3 text-sm text-slate-800 shadow-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      placeholder="Anything the clinic should know about your preferred slot?"
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={submitResponse}
+                  isLoading={submitting}
+                  disabled={!isRescheduleReady}
+                  className="w-full"
+                >
+                  <Icon size={18} className="mr-2" />
+                  {meta.button}
+                </Button>
               </div>
             ) : (
               <Button
@@ -114,12 +190,6 @@ export default function AppointmentResponse() {
             )}
           </>
         )}
-
-        <div className="mt-8 border-t border-slate-100 pt-4 text-center text-sm text-slate-500">
-          <Link to="/login" className="font-medium text-primary-600 hover:text-primary-700">
-            Staff login
-          </Link>
-        </div>
       </div>
     </div>
   );

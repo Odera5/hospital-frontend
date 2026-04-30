@@ -34,6 +34,9 @@ export default function PaystackCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const reference = String(searchParams.get("reference") || "").trim();
+  const hasStoredSession = Boolean(
+    localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken"),
+  );
   const [status, setStatus] = useState(reference ? "loading" : "error");
   const [message, setMessage] = useState(
     reference
@@ -51,7 +54,7 @@ export default function PaystackCallback() {
     const verifyPayment = async () => {
       try {
         const response = await api.get(
-          `/billing/paystack/verify?reference=${encodeURIComponent(reference)}`,
+          `/billing/paystack/verify-public?reference=${encodeURIComponent(reference)}`,
         );
 
         if (!isMounted) {
@@ -63,11 +66,13 @@ export default function PaystackCallback() {
         setStatus("success");
         setMessage(
           response.data?.message ||
-            "Your PrimuxCare Pro subscription is now active.",
+            (hasStoredSession
+              ? "Your PrimuxCare Pro subscription is now active."
+              : "Your PrimuxCare Pro payment was confirmed. Sign in to continue."),
         );
 
         window.setTimeout(() => {
-          navigate("/upgrade", { replace: true });
+          navigate(hasStoredSession ? "/upgrade" : "/login", { replace: true });
         }, 1800);
       } catch (error) {
         if (!isMounted) {
@@ -87,7 +92,7 @@ export default function PaystackCallback() {
     return () => {
       isMounted = false;
     };
-  }, [navigate, reference]);
+  }, [hasStoredSession, navigate, reference]);
 
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-10">
@@ -110,11 +115,11 @@ export default function PaystackCallback() {
           {message}
         </p>
         <div className="mt-6">
-          <Link
-            to="/upgrade"
+            <Link
+            to={hasStoredSession ? "/upgrade" : "/login"}
             className="inline-flex rounded-xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800"
           >
-            Back to billing
+            {hasStoredSession ? "Back to billing" : "Go to login"}
           </Link>
         </div>
       </div>
