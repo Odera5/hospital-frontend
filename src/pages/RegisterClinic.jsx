@@ -1,13 +1,21 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Building2, Phone, MapPin, Mail, Lock, User, Globe } from "lucide-react";
+import {
+  Building2,
+  Phone,
+  MapPin,
+  Mail,
+  Lock,
+  User,
+  Globe,
+} from "lucide-react";
 import api from "../services/api";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
 import Button from "../components/ui/Button";
 import usePersistentState from "../hooks/usePersistentState";
-import primuxFavicon from "../assets/PrimuxCareFavicon.png";
+import primuxFavicon from "../assets/NewPrimuxCareFavicon.png";
 import { COUNTRIES } from "../constants/countries";
 
 const initialForm = {
@@ -73,8 +81,9 @@ export default function RegisterClinic() {
 
     try {
       const response = await api.post("/auth/register-clinic", payload);
-      const successMessage = response.data?.message ||
-          "Clinic registered successfully. Please check the admin email inbox to confirm the address and activate the account.";
+      const successMessage =
+        response.data?.message ||
+        "Clinic registered successfully. Please check the admin email inbox to confirm the address and activate the account.";
       clearFormDraft();
       setPassword("");
       navigate("/login", { state: { successMessage } });
@@ -129,7 +138,9 @@ export default function RegisterClinic() {
               The modern operating system for forward-thinking clinics.
             </h1>
             <p className="max-w-md text-lg text-primary-50/80">
-              Each clinic gets its own staff accounts and patient data space. Patient records, appointments, and billing stay perfectly isolated and secure within your clinic.
+              Each clinic gets its own staff accounts and patient data space.
+              Patient records, appointments, and billing stay perfectly isolated
+              and secure within your clinic.
             </p>
           </MotionDiv>
         </div>
@@ -184,7 +195,9 @@ export default function RegisterClinic() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Phase 1: Clinic Details */}
             <div className="space-y-4 rounded-2xl border border-surface-200 bg-white p-6 shadow-sm">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-900">Clinic Details</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-900">
+                Clinic Details
+              </h3>
               <Input
                 label="Clinic Name"
                 name="clinicName"
@@ -225,9 +238,13 @@ export default function RegisterClinic() {
                   onChange={handleChange}
                   className="bg-white"
                 >
-                  <option value="" disabled>Select a country</option>
-                  {COUNTRIES.map(country => (
-                    <option key={country} value={country}>{country}</option>
+                  <option value="" disabled>
+                    Select a country
+                  </option>
+                  {COUNTRIES.map((country) => (
+                    <option key={country} value={country}>
+                      {country}
+                    </option>
                   ))}
                 </Select>
                 <Input
@@ -241,7 +258,9 @@ export default function RegisterClinic() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">Clinic Address</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Clinic Address
+                </label>
                 <textarea
                   name="clinicAddress"
                   value={form.clinicAddress}
@@ -255,7 +274,9 @@ export default function RegisterClinic() {
 
             {/* Phase 2: Admin Details */}
             <div className="space-y-4 rounded-2xl border border-surface-200 bg-white p-6 shadow-sm">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-900">Primary Admin Detail</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-900">
+                Primary Admin Detail
+              </h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <Input
                   label="Admin Name"
@@ -303,7 +324,13 @@ export default function RegisterClinic() {
               &larr; Back to Login
             </Link>
             <p className="text-sm text-slate-500">
-              Need support? <Link to="/support" className="font-medium text-primary-600 hover:text-primary-700 hover:underline">Contact us</Link>
+              Need support?{" "}
+              <Link
+                to="/support"
+                className="font-medium text-primary-600 hover:text-primary-700 hover:underline"
+              >
+                Contact us
+              </Link>
             </p>
           </div>
         </MotionDiv>

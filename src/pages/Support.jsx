@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Mail, MessageCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import Button from "../components/ui/Button";
 import { Card, CardContent } from "../components/ui/Card";
-import primuxFavicon from "../assets/PrimuxCareFavicon.png";
+import primuxFavicon from "../assets/NewPrimuxCareFavicon.png";
 
 const supportEmail = "support@primuxcare.com";
 const infoEmail = "info@primuxcare.com";
@@ -19,7 +19,7 @@ export default function Support() {
       <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary-400 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 z-0" />
       <div className="absolute top-40 -left-40 w-[500px] h-[500px] bg-indigo-400 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 z-0" />
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
@@ -37,58 +37,91 @@ export default function Support() {
             How can we help?
           </h1>
           <p className="mt-4 text-primary-100 text-lg max-w-lg mx-auto">
-            PrimuxCare is here to ensure your clinic runs seamlessly. Get in touch with our product support team.
+            PrimuxCare is here to ensure your clinic runs seamlessly. Get in
+            touch with our product support team.
           </p>
         </div>
 
         <Card className="shadow-2xl border-0 overflow-hidden bg-white/95 backdrop-blur-sm rounded-3xl">
           <div className="p-8 md:p-10">
-            <h2 className="text-2xl font-bold text-slate-900 mb-6">Contact Us</h2>
-            
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">
+              Contact Us
+            </h2>
+
             <div className="grid gap-6 md:grid-cols-3">
-              <a 
+              <a
                 href={`mailto:${supportEmail}`}
                 className="group flex flex-col p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-primary-50 hover:border-primary-200 transition-all duration-300"
               >
                 <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100 mb-4 group-hover:scale-110 group-hover:bg-primary-600 group-hover:text-white group-hover:border-primary-600 transition-all duration-300">
-                  <Mail size={24} className="text-slate-600 group-hover:text-white transition-colors" />
+                  <Mail
+                    size={24}
+                    className="text-slate-600 group-hover:text-white transition-colors"
+                  />
                 </div>
-                <h3 className="font-semibold text-slate-900 mb-1">Technical Support</h3>
-                <p className="text-primary-600 font-medium group-hover:underline text-sm mb-2">{supportEmail}</p>
-                <p className="text-slate-500 text-sm mt-auto">For technical issues and product assistance.</p>
+                <h3 className="font-semibold text-slate-900 mb-1">
+                  Technical Support
+                </h3>
+                <p className="text-primary-600 font-medium group-hover:underline text-sm mb-2">
+                  {supportEmail}
+                </p>
+                <p className="text-slate-500 text-sm mt-auto">
+                  For technical issues and product assistance.
+                </p>
               </a>
 
-              <a 
+              <a
                 href={`mailto:${infoEmail}`}
                 className="group flex flex-col p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-blue-50 hover:border-blue-200 transition-all duration-300"
               >
                 <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100 mb-4 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all duration-300">
-                  <Mail size={24} className="text-slate-600 group-hover:text-white transition-colors" />
+                  <Mail
+                    size={24}
+                    className="text-slate-600 group-hover:text-white transition-colors"
+                  />
                 </div>
-                <h3 className="font-semibold text-slate-900 mb-1">General Info</h3>
-                <p className="text-blue-600 font-medium group-hover:underline text-sm mb-2">{infoEmail}</p>
-                <p className="text-slate-500 text-sm mt-auto">For general inquiries and billing questions.</p>
+                <h3 className="font-semibold text-slate-900 mb-1">
+                  General Info
+                </h3>
+                <p className="text-blue-600 font-medium group-hover:underline text-sm mb-2">
+                  {infoEmail}
+                </p>
+                <p className="text-slate-500 text-sm mt-auto">
+                  For general inquiries and billing questions.
+                </p>
               </a>
 
-              <a 
+              <a
                 href={whatsappLink}
                 target="_blank"
                 rel="noreferrer"
                 className="group flex flex-col p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-emerald-50 hover:border-emerald-200 transition-all duration-300"
               >
                 <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100 mb-4 group-hover:scale-110 group-hover:bg-emerald-500 group-hover:text-white group-hover:border-emerald-500 transition-all duration-300">
-                  <MessageCircle size={24} className="text-slate-600 group-hover:text-white transition-colors" />
+                  <MessageCircle
+                    size={24}
+                    className="text-slate-600 group-hover:text-white transition-colors"
+                  />
                 </div>
-                <h3 className="font-semibold text-slate-900 mb-1">WhatsApp Chat</h3>
-                <p className="text-emerald-700 font-medium group-hover:underline text-sm mb-2">{whatsappNumber}</p>
-                <p className="text-slate-500 text-sm mt-auto">Immediate assistance for urgent issues.</p>
+                <h3 className="font-semibold text-slate-900 mb-1">
+                  WhatsApp Chat
+                </h3>
+                <p className="text-emerald-700 font-medium group-hover:underline text-sm mb-2">
+                  {whatsappNumber}
+                </p>
+                <p className="text-slate-500 text-sm mt-auto">
+                  Immediate assistance for urgent issues.
+                </p>
               </a>
             </div>
           </div>
-          
+
           <div className="bg-slate-50 p-6 md:p-8 border-t border-slate-100 w-full flex flex-col sm:flex-row gap-4 items-center justify-between">
             <Link to="/login" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full sm:w-auto text-slate-600 bg-white hover:bg-slate-100 border-slate-200">
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto text-slate-600 bg-white hover:bg-slate-100 border-slate-200"
+              >
                 <ArrowLeft size={18} className="mr-2" /> Back to Login
               </Button>
             </Link>

@@ -5,9 +5,12 @@ import { Mail, Lock } from "lucide-react";
 import api from "../services/api";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { clearLastVisitedRoute, readLastVisitedRoute } from "../utils/persistence";
+import {
+  clearLastVisitedRoute,
+  readLastVisitedRoute,
+} from "../utils/persistence";
 import usePersistentState from "../hooks/usePersistentState";
-import primuxFavicon from "../assets/PrimuxCareFavicon.png";
+import primuxFavicon from "../assets/NewPrimuxcareFavicon.png";
 
 export default function Login() {
   const [loginDraft, setLoginDraft, clearLoginDraft] = usePersistentState(
@@ -15,8 +18,14 @@ export default function Login() {
     { email: "", rememberMe: false },
   );
   const [password, setPassword] = useState("");
-  const [error, setError] = usePersistentState("primuxcare:draft:login:error", "");
-  const [success, setSuccess] = usePersistentState("primuxcare:draft:login:success", "");
+  const [error, setError] = usePersistentState(
+    "primuxcare:draft:login:error",
+    "",
+  );
+  const [success, setSuccess] = usePersistentState(
+    "primuxcare:draft:login:success",
+    "",
+  );
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const navigate = useNavigate();
@@ -29,8 +38,10 @@ export default function Login() {
       window.history.replaceState({}, document.title);
     }
   }, [location.state, setSuccess]);
-  
-  const canResendVerification = error === "Please confirm your email address to activate your account before signing in.";
+
+  const canResendVerification =
+    error ===
+    "Please confirm your email address to activate your account before signing in.";
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -67,7 +78,7 @@ export default function Login() {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Invalid email or password"
+          "Invalid email or password",
       );
     } finally {
       setLoading(false);
@@ -76,7 +87,9 @@ export default function Login() {
 
   const handleResendVerification = async () => {
     if (!email.trim()) {
-      setError("Enter your email address first so we know where to send the verification link.");
+      setError(
+        "Enter your email address first so we know where to send the verification link.",
+      );
       return;
     }
     try {
@@ -85,11 +98,12 @@ export default function Login() {
       setSuccess("");
       const response = await api.post("/auth/resend-verification", { email });
       setSuccess(
-        response.data?.message || "A new verification email has been sent."
+        response.data?.message || "A new verification email has been sent.",
       );
     } catch (err) {
       setError(
-        err.response?.data?.message || "We could not resend the verification email."
+        err.response?.data?.message ||
+          "We could not resend the verification email.",
       );
     } finally {
       setResending(false);
@@ -126,7 +140,8 @@ export default function Login() {
               PrimuxCare
             </h1>
             <p className="max-w-md text-lg text-primary-50">
-              The modern, seamless operating system for forward-thinking clinics.
+              The modern, seamless operating system for forward-thinking
+              clinics.
             </p>
           </motion.div>
         </div>
@@ -184,7 +199,12 @@ export default function Login() {
               type="email"
               icon={Mail}
               value={email}
-              onChange={(e) => setLoginDraft((current) => ({ ...current, email: e.target.value }))}
+              onChange={(e) =>
+                setLoginDraft((current) => ({
+                  ...current,
+                  email: e.target.value,
+                }))
+              }
               placeholder="name@clinic.com"
               required
             />
@@ -205,12 +225,20 @@ export default function Login() {
                   type="checkbox"
                   className="h-4 w-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
                   checked={rememberMe}
-                  onChange={(e) => setLoginDraft((current) => ({ ...current, rememberMe: e.target.checked }))}
+                  onChange={(e) =>
+                    setLoginDraft((current) => ({
+                      ...current,
+                      rememberMe: e.target.checked,
+                    }))
+                  }
                 />
                 <span className="ml-2 text-sm text-slate-600">Remember me</span>
               </label>
 
-              <Link to="/forgot-password" className="text-sm font-semibold text-primary-600 hover:text-primary-500 transition-colors">
+              <Link
+                to="/forgot-password"
+                className="text-sm font-semibold text-primary-600 hover:text-primary-500 transition-colors"
+              >
                 Forgot password?
               </Link>
             </div>
@@ -235,7 +263,9 @@ export default function Login() {
           )}
 
           <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm">
-            <h3 className="text-sm font-semibold text-slate-800">New Clinic?</h3>
+            <h3 className="text-sm font-semibold text-slate-800">
+              New Clinic?
+            </h3>
             <p className="mt-1 text-sm text-slate-500">
               Set up your space and create the first admin account.
             </p>
