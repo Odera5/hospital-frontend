@@ -223,7 +223,7 @@ export default function UpgradePlan() {
         </div>
       </div>
 
-      <div className="grid gap-8 max-w-2xl mx-auto">
+      <div className="grid gap-8 max-w-md mx-auto">
         <div className="bg-gradient-to-b from-slate-50 via-white to-slate-100 rounded-3xl p-8 md:p-7 border border-slate-200 shadow-xl flex flex-col relative">
           {isPro && (
             <div className="absolute top-0 right-8 transform -translate-y-1/2">
@@ -256,7 +256,7 @@ export default function UpgradePlan() {
           </div>
 
           <Button
-            className="w-full py-6 text-lg font-bold bg-primary-500 hover:bg-primary-400 text-white shadow-[0_0_20px_rgba(14,165,233,0.3)] border-transparent"
+            className="w-full py-4 text-base font-bold bg-primary-500 hover:bg-primary-400 text-white shadow-[0_0_20px_rgba(14,165,233,0.3)] border-transparent"
             onClick={handleUpgradeClick}
             isLoading={checkoutLoading}
           >
@@ -267,8 +267,8 @@ export default function UpgradePlan() {
                 : "Subscribe Now"}
           </Button>
 
-          <div className="h-8 flex justify-center items-center mb-4">
-            <p className="text-slate-600 text-xs font-medium bg-white px-3 py-1 rounded-full border border-slate-200 text-center">
+          <div className="mt-5 mb-5 flex justify-center items-center">
+            <p className="text-slate-600 text-xs font-medium bg-white px-4 py-2 rounded-xl border border-slate-200 text-center leading-relaxed">
               New clinics begin with a 14-day trial, then continue with
               secure recurring billing in NGN.
             </p>
