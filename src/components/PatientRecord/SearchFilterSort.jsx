@@ -2,49 +2,35 @@ import React, { useEffect } from "react";
 import { Search, Calendar, SortDesc } from "lucide-react";
 import usePersistentState from "../../hooks/usePersistentState";
 
-export default function SearchFilterSort({ records, onFiltered, storageKey = "primuxcare:draft:record-search" }) {
-  const [filters, setFilters] = usePersistentState(storageKey, {
+export default function SearchFilterSort({
+  filters: externalFilters,
+  onChange,
+  storageKey = "primuxcare:draft:record-search",
+}) {
+  const [storedFilters, setStoredFilters] = usePersistentState(storageKey, {
     searchText: "",
     sortOption: "recent",
     startDate: "",
     endDate: "",
   });
-  const { searchText, sortOption, startDate, endDate } = filters;
-  const updateFilters = (patch) =>
-    setFilters((current) => ({ ...current, ...patch }));
+  const activeFilters = externalFilters || storedFilters || {};
+  const {
+    searchText = "",
+    sortOption = "recent",
+    startDate = "",
+    endDate = "",
+  } = activeFilters;
 
   useEffect(() => {
-    let filtered = [...records];
+    if (!externalFilters) return;
+    setStoredFilters(externalFilters);
+  }, [externalFilters, setStoredFilters]);
 
-    if (searchText.trim()) {
-      const text = searchText.toLowerCase();
-      filtered = filtered.filter(
-        (r) =>
-          (r.presentingComplaint && r.presentingComplaint.toLowerCase().includes(text)) ||
-          (r.diagnosis && r.diagnosis.toLowerCase().includes(text)) ||
-          (r.history && r.history.toLowerCase().includes(text))
-      );
-    }
-
-    if (startDate) {
-      const start = new Date(startDate);
-      filtered = filtered.filter((r) => new Date(r.createdAt) >= start);
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      filtered = filtered.filter((r) => new Date(r.createdAt) <= end);
-    }
-
-    if (sortOption === "recent") {
-      filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    } else if (sortOption === "oldest") {
-      filtered.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    } else if (sortOption === "diagnosis") {
-      filtered.sort((a, b) => (a.diagnosis || "").localeCompare(b.diagnosis || ""));
-    }
-
-    onFiltered(filtered, searchText);
-  }, [onFiltered, records, searchText, sortOption, startDate, endDate]);
+  const updateFilters = (patch) => {
+    const nextFilters = { ...activeFilters, ...patch };
+    setStoredFilters(nextFilters);
+    onChange?.(nextFilters);
+  };
 
   return (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 group focus-within:border-primary-300 transition-colors">

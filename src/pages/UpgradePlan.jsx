@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { Check, Crown, FileUp, BookOpen } from "lucide-react";
 import api from "../services/api";
 import Toast from "../components/Toast";
@@ -149,7 +150,7 @@ export default function UpgradePlan() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6 md:p-8 min-h-full">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="w-full max-w-4xl mx-auto p-6 md:p-8 min-h-full">
       {toast && (
         <Toast
           message={toast.message}
@@ -167,29 +168,29 @@ export default function UpgradePlan() {
 
       <div className="text-center mb-12">
         <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">
-          Keep Your Clinic on Pro
+          Unlock Full Access
         </h1>
         <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-          Start with 14 days of full Pro access, then continue with a paid Pro
+          Start with a 14-day free trial, then continue with a paid
           subscription for unlimited patients, automated reminders, and
           advanced analytics.
         </p>
         {trialing && (
           <p className="mt-4 text-sm inline-flex items-center gap-2 font-medium text-primary-700 bg-primary-50 px-4 py-1.5 rounded-full border border-primary-100 shadow-sm">
-            <Crown size={16} /> Your 14-day Pro trial has {remainingTrialDays} day
+            <Crown size={16} /> Your 14-day trial has {remainingTrialDays} day
             {remainingTrialDays === 1 ? "" : "s"} remaining.
           </p>
         )}
         {paidSubscriptionActive && (
           <p className="mt-4 text-sm inline-flex items-center gap-2 font-medium text-emerald-700 bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-100 shadow-sm">
-            <Crown size={16} /> Pro Plan Active - Next payment:{" "}
+            <Crown size={16} /> Subscription Active - Next payment:{" "}
             {formattedNextPaymentDate || formattedRenewalDate}
           </p>
         )}
         {!proAccessActive && !paidSubscriptionActive && (
           <p className="mt-4 text-sm inline-flex items-center gap-2 font-medium text-rose-700 bg-rose-50 px-4 py-1.5 rounded-full border border-rose-100 shadow-sm">
-            <Crown size={16} /> Your Pro trial has ended. Subscribe to continue
-            using PrimuxCare.
+            <Crown size={16} /> Your trial has ended. Subscribe to continue
+            using the platform.
           </p>
         )}
       </div>
@@ -238,9 +239,9 @@ export default function UpgradePlan() {
           </div>
 
           <div className="mb-6 mt-4">
-            <h3 className="text-2xl font-bold text-slate-900 mb-2">Pro</h3>
+            <h3 className="text-2xl font-bold text-slate-900 mb-2">Professional Plan</h3>
             <p className="text-slate-600 text-sm">
-              Full PrimuxCare access for clinics that need scale, automation,
+              Full access for clinics that need scale, automation,
               and uninterrupted operations.
             </p>
           </div>
@@ -262,13 +263,13 @@ export default function UpgradePlan() {
             {paidSubscriptionActive
               ? "Update Payment Method"
               : trialing
-                ? "Start Paid Pro Billing"
-                : "Subscribe to Pro Plan"}
+                ? "Start Paid Subscription"
+                : "Subscribe Now"}
           </Button>
 
           <div className="h-8 flex justify-center items-center mb-4">
             <p className="text-slate-600 text-xs font-medium bg-white px-3 py-1 rounded-full border border-slate-200 text-center">
-              New clinics begin with a 14-day Pro trial, then continue with
+              New clinics begin with a 14-day trial, then continue with
               secure recurring billing in NGN.
             </p>
           </div>
@@ -314,7 +315,7 @@ export default function UpgradePlan() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

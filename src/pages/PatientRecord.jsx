@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, UserCog, ArrowLeft, Activity, User, Phone, MapPin, Hash } from "lucide-react";
@@ -27,13 +27,27 @@ export default function PatientRecord() {
   const canManageRecords = storedUser.role === "admin" || storedUser.role === "doctor";
   const patientEditDraftKey = `primuxcare:draft:patient-edit:${id}`;
   const patientEditModalKey = `primuxcare:draft:patient-edit-modal:${id}`;
+  const recordFiltersStorageKey = `primuxcare:draft:patient-record:filters:${id}`;
   const hasSavedPatientEditDraft = Boolean(readStoredJson(patientEditDraftKey, null));
 
   const [patient, setPatient] = useState(null);
   const [records, setRecords] = useState([]);
-  const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchKeyword, setSearchKeyword] = useState("");
+  const [recordMeta, setRecordMeta] = useState({
+    page: 1,
+    limit: RECORDS_PER_PAGE,
+    total: 0,
+    totalPages: 1,
+  });
+  const [recordFilters, setRecordFilters] = useState({
+    ...{
+      searchText: "",
+      sortOption: "recent",
+      startDate: "",
+      endDate: "",
+    },
+    ...(readStoredJson(recordFiltersStorageKey, null) || {}),
+  });
   const [patientForm, setPatientForm, clearPatientFormDraft] = usePersistentState(
     patientEditDraftKey,
     { name: "", cardNumber: "", age: "", gender: "other", phone: "", email: "", address: "" },
@@ -58,13 +72,13 @@ export default function PatientRecord() {
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmConfig, setConfirmConfig] = useState(null);
   const [isTrashView, setIsTrashView] = useState(false);
+  const [recordsRefreshToken, setRecordsRefreshToken] = useState(0);
 
   const showToast = (message, type = "success") => setToast({ show: true, message, type });
 
-  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / RECORDS_PER_PAGE));
+  const totalPages = Math.max(1, recordMeta.totalPages || 1);
   const currentPageSafe = Math.min(currentPage, totalPages);
-  const pageStartIndex = (currentPageSafe - 1) * RECORDS_PER_PAGE;
-  const paginatedRecords = filteredRecords.slice(pageStartIndex, pageStartIndex + RECORDS_PER_PAGE);
+  const pageStartIndex = Math.max(0, (currentPageSafe - 1) * RECORDS_PER_PAGE);
 
   const createFormData = (recordData, removedAttachments = []) => {
     const formData = new FormData();
@@ -101,9 +115,25 @@ export default function PatientRecord() {
     const fetchPatient = async () => {
       try {
         setLoading(true);
+        const params = new URLSearchParams({
+          trash: String(isTrashView),
+          page: String(currentPage),
+          limit: String(RECORDS_PER_PAGE),
+          sortOption: recordFilters.sortOption,
+        });
+        if (recordFilters.searchText.trim()) {
+          params.append("search", recordFilters.searchText.trim());
+        }
+        if (recordFilters.startDate) {
+          params.append("startDate", recordFilters.startDate);
+        }
+        if (recordFilters.endDate) {
+          params.append("endDate", recordFilters.endDate);
+        }
+
         const [resPatient, resRecords] = await Promise.all([
           api.get(`/patients/${id}`),
-          api.get(`/patients/${id}/records?trash=${isTrashView}`),
+          api.get(`/patients/${id}/records?${params}`),
         ]);
         setPatient(resPatient.data);
         if (!hasSavedPatientEditDraft) {
@@ -113,20 +143,35 @@ export default function PatientRecord() {
             phone: resPatient.data?.phone || "", email: resPatient.data?.email || "", address: resPatient.data?.address || "",
           });
         }
-        setRecords(resRecords.data);
-        setFilteredRecords(resRecords.data);
+        setRecords(resRecords.data?.data || []);
+        setRecordMeta({
+          page: resRecords.data?.page || 1,
+          limit: resRecords.data?.limit || RECORDS_PER_PAGE,
+          total: resRecords.data?.total || 0,
+          totalPages: resRecords.data?.totalPages || 1,
+        });
       } catch { showToast("Failed to fetch patient data", "error"); } finally { setLoading(false); }
     };
     fetchPatient();
-  }, [hasSavedPatientEditDraft, id, setPatientForm, isTrashView]);
+  }, [
+    currentPage,
+    hasSavedPatientEditDraft,
+    id,
+    isTrashView,
+    recordsRefreshToken,
+    recordFilters.endDate,
+    recordFilters.searchText,
+    recordFilters.sortOption,
+    recordFilters.startDate,
+    setPatientForm,
+  ]);
 
   const handleAddRecord = async (recordData) => {
     try {
       setAddLoading(true);
-      const res = await api.post(`/patients/${id}/records`, createFormData(recordData));
-      const updatedRecords = [res.data, ...records];
-      setRecords(updatedRecords);
-      setFilteredRecords(updatedRecords);
+      await api.post(`/patients/${id}/records`, createFormData(recordData));
+      setCurrentPage(1);
+      setRecordsRefreshToken((current) => current + 1);
       showToast("Record added successfully!", "success");
       return true;
     } catch (err) { showToast(err.response?.data?.message || "Failed to add record", "error"); return false; } finally { setAddLoading(false); }
@@ -135,9 +180,19 @@ export default function PatientRecord() {
   const executeDeleteRecord = async (recordId) => {
     try {
       await api.delete(`/patients/${id}/records/${recordId}`);
-      const updatedRecords = records.filter((r) => getEntityId(r) !== recordId);
-      setRecords(updatedRecords);
-      setFilteredRecords(updatedRecords);
+      const updatedTotal = Math.max(0, (recordMeta.total || 0) - 1);
+      const nextTotalPages = Math.max(1, Math.ceil(updatedTotal / RECORDS_PER_PAGE));
+      if (currentPage > nextTotalPages) {
+        setCurrentPage(nextTotalPages);
+      } else {
+        setRecords((current) => current.filter((r) => getEntityId(r) !== recordId));
+        setRecordMeta((current) => ({
+          ...current,
+          total: updatedTotal,
+          totalPages: nextTotalPages,
+        }));
+      }
+      setRecordsRefreshToken((current) => current + 1);
       showToast("Record moved to Trash", "success");
     } catch (err) { showToast(err.response?.data?.message || "Failed to move record to Trash", "error"); }
   };
@@ -155,9 +210,19 @@ export default function PatientRecord() {
   const executeRestoreRecord = async (recordId) => {
     try {
       await api.patch(`/patients/${id}/records/${recordId}/restore`);
-      const updatedRecords = records.filter((r) => getEntityId(r) !== recordId);
-      setRecords(updatedRecords);
-      setFilteredRecords(updatedRecords);
+      const updatedTotal = Math.max(0, (recordMeta.total || 0) - 1);
+      const nextTotalPages = Math.max(1, Math.ceil(updatedTotal / RECORDS_PER_PAGE));
+      if (currentPage > nextTotalPages) {
+        setCurrentPage(nextTotalPages);
+      } else {
+        setRecords((current) => current.filter((r) => getEntityId(r) !== recordId));
+        setRecordMeta((current) => ({
+          ...current,
+          total: updatedTotal,
+          totalPages: nextTotalPages,
+        }));
+      }
+      setRecordsRefreshToken((current) => current + 1);
       showToast("Record restored successfully!", "success");
     } catch (err) { showToast(err.response?.data?.message || "Failed to restore record", "error"); }
   };
@@ -175,9 +240,19 @@ export default function PatientRecord() {
   const executeHardDeleteRecord = async (recordId) => {
     try {
       await api.delete(`/patients/${id}/records/${recordId}/hard`);
-      const updatedRecords = records.filter((r) => getEntityId(r) !== recordId);
-      setRecords(updatedRecords);
-      setFilteredRecords(updatedRecords);
+      const updatedTotal = Math.max(0, (recordMeta.total || 0) - 1);
+      const nextTotalPages = Math.max(1, Math.ceil(updatedTotal / RECORDS_PER_PAGE));
+      if (currentPage > nextTotalPages) {
+        setCurrentPage(nextTotalPages);
+      } else {
+        setRecords((current) => current.filter((r) => getEntityId(r) !== recordId));
+        setRecordMeta((current) => ({
+          ...current,
+          total: updatedTotal,
+          totalPages: nextTotalPages,
+        }));
+      }
+      setRecordsRefreshToken((current) => current + 1);
       showToast("Record permanently deleted!", "success");
     } catch (err) { showToast(err.response?.data?.message || "Failed to permanently delete record", "error"); }
   };
@@ -197,7 +272,6 @@ export default function PatientRecord() {
       const res = await api.put(`/patients/${id}/records/${recordId}`, createFormData(updatedData, removedAttachments));
       const updatedRecords = records.map((r) => getEntityId(r) === recordId ? res.data : r);
       setRecords(updatedRecords);
-      setFilteredRecords(updatedRecords);
       showToast("Record updated successfully!", "success");
     } catch (err) { showToast(err.response?.data?.message || "Failed to update record", "error"); }
   };
@@ -230,13 +304,8 @@ export default function PatientRecord() {
     } catch (err) { showToast(err.response?.data?.message || "Failed to update patient information", "error"); } finally { setPatientSaveLoading(false); }
   };
 
-  useEffect(() => { setCurrentPage(1); }, [filteredRecords.length, searchKeyword]);
+  useEffect(() => { setCurrentPage(1); }, [id, isTrashView, recordFilters.endDate, recordFilters.searchText, recordFilters.sortOption, recordFilters.startDate]);
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
-
-  const handleFiltered = useCallback((filtered, keyword) => {
-    setFilteredRecords(filtered);
-    setSearchKeyword(keyword);
-  }, []);
 
   if (loading) return <div className="p-8 text-center flex flex-col items-center justify-center min-h-[50vh]"><div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4"></div><p className="text-slate-500 font-medium">Loading patient data...</p></div>;
   if (!patient) return <div className="p-8 text-center text-rose-500 font-medium"><p>Patient not found or you don't have access.</p></div>;
@@ -266,26 +335,30 @@ export default function PatientRecord() {
          <button onClick={() => setIsTrashView(true)} className={`py-3 px-6 font-bold text-sm border-b-2 transition-colors ${isTrashView ? 'border-rose-500 text-rose-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Trash</button>
       </div>
 
-      <SearchFilterSort records={records} onFiltered={handleFiltered} storageKey={`primuxcare:draft:patient-record:filters:${id}`} />
+      <SearchFilterSort
+        filters={recordFilters}
+        onChange={setRecordFilters}
+        storageKey={recordFiltersStorageKey}
+      />
 
       <div className="space-y-4">
-        {filteredRecords.length === 0 ? (
+        {records.length === 0 ? (
           <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 py-16 text-center shadow-sm flex flex-col items-center">
              <Activity size={48} className="text-slate-300 mb-4" />
              <p className="text-lg font-medium text-slate-700">No clinical records found</p>
              <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">Create a new record to begin adding history, exams, and dental charting.</p>
           </div>
         ) : (
-          paginatedRecords.map((record) => (
-            <RecordItem key={getEntityId(record)} record={record} expandedRecordId={expandedRecordId} setExpandedRecordId={setExpandedRecordId} handleDelete={handleDeleteRecord} handleRestore={handleRestoreRecord} handleHardDelete={handleHardDeleteRecord} handleSaveEdit={handleSaveEdit} searchKeyword={searchKeyword} canManageRecords={canManageRecords} />
+          records.map((record) => (
+            <RecordItem key={getEntityId(record)} record={record} expandedRecordId={expandedRecordId} setExpandedRecordId={setExpandedRecordId} handleDelete={handleDeleteRecord} handleRestore={handleRestoreRecord} handleHardDelete={handleHardDeleteRecord} handleSaveEdit={handleSaveEdit} searchKeyword={recordFilters.searchText} canManageRecords={canManageRecords} />
           ))
         )}
       </div>
 
-      {filteredRecords.length > 0 && (
+      {recordMeta.total > 0 && (
         <Card className="border-0 shadow-sm bg-white mt-6">
           <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm font-medium text-slate-600">Showing <strong className="text-slate-900">{pageStartIndex + 1}-{Math.min(pageStartIndex + RECORDS_PER_PAGE, filteredRecords.length)}</strong> of <strong className="text-slate-900">{filteredRecords.length}</strong> records</p>
+            <p className="text-sm font-medium text-slate-600">Showing <strong className="text-slate-900">{pageStartIndex + 1}-{Math.min(pageStartIndex + records.length, recordMeta.total)}</strong> of <strong className="text-slate-900">{recordMeta.total}</strong> records</p>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPageSafe === 1} className="bg-white">Previous</Button>
               <span className="text-sm font-bold text-slate-700 px-2 lg:px-4 whitespace-nowrap">{currentPageSafe} / {totalPages}</span>

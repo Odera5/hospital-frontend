@@ -186,6 +186,7 @@ function InvoiceViewer({ invoice, onClose }) {
 }
 
 export default function InvoiceList({ patientId = null }) {
+  const INVOICES_PER_PAGE = 20;
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uiState, setUiState, clearUiState] = usePersistentState(
@@ -201,57 +202,96 @@ export default function InvoiceList({ patientId = null }) {
   const [viewingInvoice, setViewingInvoice] = useState(null);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [report, setReport] = useState(null);
+  const [invoicePatients, setInvoicePatients] = useState([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: INVOICES_PER_PAGE,
+    total: 0,
+    totalPages: 1,
+  });
 
   const fetchInvoices = useCallback(async () => {
-    try { setLoading(true); const params = new URLSearchParams(); if (patientId) params.append("patientId", patientId); const response = await api.get(`/invoices?${params}`); setInvoices(response.data || []); } catch (error) { setToast({ show: true, message: error.response?.data?.message || "Failed to fetch invoices", type: "error" }); } finally { setLoading(false); }
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (patientId) params.append("patientId", patientId);
+      if (selectedPatientId) params.append("patientId", selectedPatientId);
+      if (filterStatus !== "all") params.append("status", filterStatus);
+      params.append("page", String(pagination.page || 1));
+      params.append("limit", String(INVOICES_PER_PAGE));
+      const response = await api.get(`/invoices?${params}`);
+      setInvoices(response.data?.data || []);
+      setPagination((current) => ({
+        ...current,
+        page: response.data?.page || current.page,
+        limit: response.data?.limit || current.limit,
+        total: response.data?.total || 0,
+        totalPages: response.data?.totalPages || 1,
+      }));
+    } catch (error) {
+      setToast({ show: true, message: error.response?.data?.message || "Failed to fetch invoices", type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  }, [filterStatus, pagination.page, patientId, selectedPatientId]);
+
+  const fetchReport = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (patientId) params.append("patientId", patientId);
+      if (selectedPatientId) params.append("patientId", selectedPatientId);
+      const response = await api.get(`/invoices/report?${params}`);
+      setReport(response.data);
+    } catch (error) { console.error(error); }
+  }, [patientId, selectedPatientId]);
+
+  const fetchInvoicePatients = useCallback(async () => {
+    if (patientId) return;
+    try {
+      const response = await api.get("/invoices/patients");
+      setInvoicePatients(response.data || []);
+    } catch (error) {
+      console.error(error);
+    }
   }, [patientId]);
 
-  const fetchReport = useCallback(async () => { try { const response = await api.get("/invoices/report"); setReport(response.data); } catch (error) { console.error(error); } }, []);
-
-  useEffect(() => { fetchInvoices(); fetchReport(); }, [fetchInvoices, fetchReport]);
+  useEffect(() => { fetchInvoices(); fetchReport(); fetchInvoicePatients(); }, [fetchInvoicePatients, fetchInvoices, fetchReport]);
+  useEffect(() => {
+    setPagination((current) => ({ ...current, page: 1 }));
+  }, [filterStatus, patientId, selectedPatientId]);
 
   const handleFormSuccess = () => { clearUiState(); setViewingInvoice(null); fetchInvoices(); fetchReport(); };
   const handleIssueInvoice = async (id) => {
     try { await api.put(`/invoices/${id}/issue`); setToast({ show: true, message: "Invoice issued", type: "success" }); fetchInvoices(); fetchReport(); } catch (error) { setToast({ show: true, message: error.response?.data?.message || "Failed to issue", type: "error" }); }
   };
 
-  const patientSummaries = useMemo(() => {
-    const summaryMap = new Map();
-    invoices.forEach((invoice) => {
-      const currentPatientId = getEntityId(invoice.patientId);
-      if (!currentPatientId) return;
-      const summary = summaryMap.get(currentPatientId) || { patient: invoice.patientId, outstanding: 0, unpaidInvoices: 0, lastVisit: null, totalBilled: 0 };
-      summary.outstanding += Number(invoice.balance) || 0;
-      summary.totalBilled += Number(invoice.total) || 0;
-      if (Number(invoice.balance) > 0 && invoice.status !== "cancelled") summary.unpaidInvoices += 1;
-      const invoiceDate = invoice.invoiceDate ? new Date(invoice.invoiceDate) : null;
-      if (invoiceDate && (!summary.lastVisit || invoiceDate > summary.lastVisit)) summary.lastVisit = invoiceDate;
-      summaryMap.set(currentPatientId, summary);
-    });
-    return Array.from(summaryMap.values()).sort((a, b) => b.outstanding - a.outstanding);
-  }, [invoices]);
-
   const filteredInvoices = useMemo(() => {
     const text = searchQuery.trim().toLowerCase();
     return invoices.filter((invoice) => {
-      if (filterStatus !== "all" && invoice.status !== filterStatus) return false;
-      if (selectedPatientId && getEntityId(invoice.patientId) !== selectedPatientId) return false;
       if (!text) return true;
       const haystack = [invoice.invoiceNumber, invoice.patientId?.name, invoice.patientId?.phone, ...(invoice.items || []).map((item) => item.description)].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(text);
     });
-  }, [filterStatus, invoices, searchQuery, selectedPatientId]);
+  }, [invoices, searchQuery]);
 
   const selectedPatientSummary = useMemo(() => {
     if (!selectedPatientId) return null;
-    return patientSummaries.find((summary) => getEntityId(summary.patient) === selectedPatientId) || null;
-  }, [patientSummaries, selectedPatientId]);
+    const patient = invoicePatients.find((summary) => getEntityId(summary) === selectedPatientId) || null;
+    if (!patient || !report) return null;
+    return {
+      patient,
+      outstanding: report.totalOutstanding || 0,
+      unpaidInvoices: (report.overdueInvoices || 0) + Math.max(0, (report.totalInvoices || 0) - (report.paidInvoices || 0) - (report.drafts || 0)),
+    };
+  }, [invoicePatients, report, selectedPatientId]);
 
   const receptionistHighlights = useMemo(() => {
-    const outstandingInvoices = invoices.filter((inv) => Number(inv.balance) > 0 && inv.status !== "cancelled");
-    const dueToday = outstandingInvoices.filter((inv) => inv.dueDate && inv.dueDate.slice(0, 10) === new Date().toISOString().slice(0, 10));
-    return { outstandingPatients: patientSummaries.filter((s) => s.outstanding > 0).length, dueToday: dueToday.length, drafts: invoices.filter((i) => i.status === "draft").length };
-  }, [invoices, patientSummaries]);
+    return {
+      outstandingPatients: report?.outstandingPatients || 0,
+      dueToday: report?.dueToday || 0,
+      drafts: report?.drafts || 0,
+    };
+  }, [report]);
 
   if (showForm) return <InvoiceForm patientId={selectedPatientId || patientId} draftStorageKey={`primuxcare:draft:invoice-form:${selectedPatientId || patientId || "new"}`} onSuccess={handleFormSuccess} onCancel={() => clearUiState()} />;
   if (viewingInvoice) return <InvoiceViewer invoice={viewingInvoice} onClose={() => { setViewingInvoice(null); fetchInvoices(); fetchReport(); }} />;
@@ -291,7 +331,7 @@ export default function InvoiceList({ patientId = null }) {
                 </div>
                 <div>
                    <div className="relative">
-                      <select value={selectedPatientId} onChange={(e) => setUiState((current) => ({ ...current, selectedPatientId: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-3 bg-slate-50 text-sm focus:ring-primary-500 shadow-sm appearance-none h-[46px]"><option value="">All Patients</option>{patientSummaries.map((summary) => (<option key={getEntityId(summary.patient)} value={getEntityId(summary.patient)}>{summary.patient?.name || "Unknown patient"}</option>))}</select>
+                      <select value={selectedPatientId} onChange={(e) => setUiState((current) => ({ ...current, selectedPatientId: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-3 bg-slate-50 text-sm focus:ring-primary-500 shadow-sm appearance-none h-[46px]"><option value="">All Patients</option>{invoicePatients.map((patient) => (<option key={getEntityId(patient)} value={getEntityId(patient)}>{patient?.name || "Unknown patient"}</option>))}</select>
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"><ChevronDown size={16} className="text-slate-400" /></div>
                    </div>
                 </div>
@@ -351,6 +391,16 @@ export default function InvoiceList({ patientId = null }) {
                        </div>
                     </div>
                   ))}
+                </div>
+              )}
+              {pagination.total > 0 && (
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 pt-4">
+                  <p className="text-sm font-medium text-slate-600">Showing <strong className="text-slate-900">{((pagination.page - 1) * INVOICES_PER_PAGE) + 1}-{Math.min(((pagination.page - 1) * INVOICES_PER_PAGE) + invoices.length, pagination.total)}</strong> of <strong className="text-slate-900">{pagination.total}</strong> invoices</p>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setPagination((current) => ({ ...current, page: Math.max(1, current.page - 1) }))} disabled={(pagination.page || 1) === 1} className="bg-white">Previous</Button>
+                    <span className="text-sm font-bold text-slate-700 px-2 lg:px-4 whitespace-nowrap">{pagination.page || 1} / {Math.max(1, pagination.totalPages || 1)}</span>
+                    <Button variant="outline" size="sm" onClick={() => setPagination((current) => ({ ...current, page: Math.min(Math.max(1, current.totalPages || 1), current.page + 1) }))} disabled={(pagination.page || 1) >= Math.max(1, pagination.totalPages || 1)} className="bg-white">Next</Button>
+                  </div>
                 </div>
               )}
             </CardContent>

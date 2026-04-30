@@ -84,9 +84,11 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
     }
   }, [patientSearchQuery]);
 
-  const fetchQueue = useCallback(async () => {
+  const fetchQueue = useCallback(async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       const params = new URLSearchParams();
       if (statusFilter !== "all") params.append("status", statusFilter);
       if (searchQuery) params.append("search", searchQuery);
@@ -95,14 +97,32 @@ export default function WaitingRoomBoard({ newPatient = null, preselectPatientId
     } catch (error) {
       console.error(error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [searchQuery, statusFilter]);
 
   useEffect(() => {
     fetchQueue();
-    const interval = setInterval(fetchQueue, 8000);
-    return () => clearInterval(interval);
+
+    const interval = setInterval(() => {
+      if (document.hidden) return;
+      fetchQueue({ silent: true });
+    }, 15000);
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchQueue({ silent: true });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [fetchQueue]);
 
   useEffect(() => {

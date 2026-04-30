@@ -16,15 +16,23 @@ import ConfirmModal from "../ui/ConfirmModal";
 import usePersistentState from "../../hooks/usePersistentState";
 
 export default function AppointmentSchedule({ patientId = null }) {
+  const APPOINTMENTS_PER_PAGE = 24;
   const storedUser = JSON.parse((localStorage.getItem("user") || sessionStorage.getItem("user"))) || {};
   const canCompleteAppointment = storedUser.role === "admin" || storedUser.role === "doctor" || storedUser.role === "nurse";
   const [appointments, setAppointments] = useState([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: APPOINTMENTS_PER_PAGE,
+    total: 0,
+    totalPages: 1,
+  });
   const [loading, setLoading] = useState(true);
   const [uiState, setUiState, clearUiState] = usePersistentState(
     `primuxcare:draft:appointment-schedule:${patientId || "general"}`,
     { showForm: false, editingAppointmentId: null, selectedDate: "" },
   );
   const { showForm, editingAppointmentId, selectedDate } = uiState;
+  const currentPage = pagination.page || 1;
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [confirmConfig, setConfirmConfig] = useState(null);
@@ -93,17 +101,29 @@ export default function AppointmentSchedule({ patientId = null }) {
         params.append("endDate", selectedDate);
       }
       params.append("status", "scheduled");
+      params.append("page", String(currentPage));
+      params.append("limit", String(APPOINTMENTS_PER_PAGE));
 
       const response = await api.get(`/appointments?${params}`);
-      setAppointments(response.data);
+      setAppointments(response.data?.data || []);
+      setPagination((current) => ({
+        ...current,
+        page: response.data?.page || current.page,
+        limit: response.data?.limit || current.limit,
+        total: response.data?.total || 0,
+        totalPages: response.data?.totalPages || 1,
+      }));
     } catch (error) {
       setToast({ show: true, message: error.response?.data?.message || "Failed to fetch appointments", type: "error" });
     } finally {
       setLoading(false);
     }
-  }, [patientId, selectedDate]);
+  }, [currentPage, patientId, selectedDate]);
 
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
+  useEffect(() => {
+    setPagination((current) => ({ ...current, page: 1 }));
+  }, [patientId, selectedDate]);
 
   useEffect(() => {
     if (!editingAppointmentId) {
@@ -193,6 +213,7 @@ export default function AppointmentSchedule({ patientId = null }) {
     refreshDashboardSummary();
     clearUiState();
     setEditingAppointment(null);
+    setPagination((current) => ({ ...current, page: 1 }));
     fetchAppointments();
     setToast({ show: true, message: editingAppointment ? "Appointment updated" : "Appointment scheduled", type: "success" });
   };
@@ -333,13 +354,14 @@ export default function AppointmentSchedule({ patientId = null }) {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          <AnimatePresence>
-            {appointments.map((apt) => (
-              <div key={getEntityId(apt)}>
-                <Card className="h-full hover:shadow-md transition-shadow relative overflow-hidden group">
-                  <div className={`absolute top-0 left-0 w-1.5 h-full ${getStatusStyle(apt.status).split(' ')[0]}`} />
-                  <CardContent className="p-5 pl-7 flex flex-col h-full gap-4">
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <AnimatePresence>
+              {appointments.map((apt) => (
+                <div key={getEntityId(apt)}>
+                  <Card className="h-full hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div className={`absolute top-0 left-0 w-1.5 h-full ${getStatusStyle(apt.status).split(' ')[0]}`} />
+                    <CardContent className="p-5 pl-7 flex flex-col h-full gap-4">
                     <div className="flex justify-between items-start gap-2">
                       <div>
                         <h3 className="font-bold text-slate-900 text-lg leading-tight line-clamp-1">
@@ -422,11 +444,26 @@ export default function AppointmentSchedule({ patientId = null }) {
                       )}
                     </div>
                   </CardContent>
-                </Card>
-              </div>
-            ))}
-          </AnimatePresence>
-        </div>
+                  </Card>
+                </div>
+              ))}
+            </AnimatePresence>
+          </div>
+          {pagination.total > 0 && (
+            <Card className="border-0 shadow-sm bg-white mt-6">
+              <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-sm font-medium text-slate-600">
+                  Showing <strong className="text-slate-900">{((currentPage - 1) * APPOINTMENTS_PER_PAGE) + 1}-{Math.min(((currentPage - 1) * APPOINTMENTS_PER_PAGE) + appointments.length, pagination.total)}</strong> of <strong className="text-slate-900">{pagination.total}</strong> appointments
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setPagination((current) => ({ ...current, page: Math.max(1, current.page - 1) }))} disabled={currentPage === 1} className="bg-white">Previous</Button>
+                  <span className="text-sm font-bold text-slate-700 px-2 lg:px-4 whitespace-nowrap">{currentPage} / {Math.max(1, pagination.totalPages || 1)}</span>
+                  <Button variant="outline" size="sm" onClick={() => setPagination((current) => ({ ...current, page: Math.min(Math.max(1, current.totalPages || 1), current.page + 1) }))} disabled={currentPage >= Math.max(1, pagination.totalPages || 1)} className="bg-white">Next</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} duration={3000} />}
