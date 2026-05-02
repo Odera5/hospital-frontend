@@ -14,6 +14,18 @@ import { resolveAssetUrl } from "../../utils/assetUrl";
 const formatCurrency = (value) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 2 }).format(Number(value) || 0);
 
+function NairaIcon({ size = 18 }) {
+  return (
+    <span
+      className="text-sm font-semibold leading-none"
+      style={{ fontSize: size }}
+      aria-hidden="true"
+    >
+      {"\u20A6"}
+    </span>
+  );
+}
+
 const getStatusColor = (status) => {
   const colors = { draft: "bg-slate-100 text-slate-700", issued: "bg-blue-100 text-blue-700", paid: "bg-emerald-100 text-emerald-700", overdue: "bg-rose-100 text-rose-700", cancelled: "bg-zinc-200 text-zinc-700" };
   return colors[status] || "bg-slate-100 text-slate-700";
@@ -168,7 +180,7 @@ function InvoiceViewer({ invoice, onClose }) {
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-6 h-fit">
               <h3 className="text-lg font-bold text-emerald-900 mb-4">Record New Payment</h3>
               <div className="space-y-4">
-                <Input label="Amount (NGN)" type="number" step="0.01" min="0" max={invoice.balance} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} icon={DollarSign} className="bg-white" />
+                <Input label="Amount (NGN)" type="number" step="0.01" min="0" max={invoice.balance} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} icon={NairaIcon} className="bg-white" />
                 <div className="space-y-1.5"><label className="text-sm font-semibold text-slate-700">Method</label><div className="relative"><select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 bg-white text-sm focus:ring-2 focus:ring-primary-500 shadow-sm appearance-none h-[46px]"><option value="cash">Cash</option><option value="card">Card / POS</option><option value="bank_transfer">Bank Transfer</option><option value="check">Check</option></select></div></div>
                 <div className="space-y-1.5"><label className="text-sm font-semibold text-slate-700">Notes (optional)</label><textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows="2" className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:ring-2 focus:ring-primary-500 shadow-sm resize-none" placeholder="Reference ID..." /></div>
                 <div className="pt-2"> 
