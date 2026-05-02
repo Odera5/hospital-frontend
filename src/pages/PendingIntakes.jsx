@@ -18,10 +18,8 @@ export default function PendingIntakes() {
   const [slotLoadingByIntake, setSlotLoadingByIntake] = useState({});
 
   const showToast = (message, type = "success") => setToast({ message, type });
-  const createApprovalDraft = (intake) => ({
-    assignedDate: intake.preferredDate
-      ? new Date(intake.preferredDate).toISOString().split("T")[0]
-      : "",
+  const createApprovalDraft = () => ({
+    assignedDate: "",
     assignedTime: "",
   });
 
