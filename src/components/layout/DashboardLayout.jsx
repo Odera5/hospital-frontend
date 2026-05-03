@@ -481,12 +481,14 @@ export default function DashboardLayout() {
                 <Crown size={18} />
                 Your Pro access has expired. Billing is available, but clinic operations are now locked until renewal.
               </span>
-              <button
-                onClick={() => navigate("/upgrade")}
-                className="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-full text-xs transition-colors border border-white/30 backdrop-blur-sm shadow-sm"
-              >
-                Renew Now
-              </button>
+              {location.pathname !== "/upgrade" && (
+                <button
+                  onClick={() => navigate("/upgrade")}
+                  className="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-full text-xs transition-colors border border-white/30 backdrop-blur-sm shadow-sm"
+                >
+                  Renew Now
+                </button>
+              )}
             </MotionDiv>
           )}
           {trialing &&
@@ -510,12 +512,14 @@ export default function DashboardLayout() {
                   {remainingTrialDays} days left on your 14-day Pro Trial.
                 </span>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => navigate("/upgrade")}
-                    className="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-full text-xs transition-colors border border-white/30 backdrop-blur-sm shadow-sm focus:outline-none"
-                  >
-                    Upgrade Now
-                  </button>
+                  {location.pathname !== "/upgrade" && (
+                    <button
+                      onClick={() => navigate("/upgrade")}
+                      className="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-full text-xs transition-colors border border-white/30 backdrop-blur-sm shadow-sm focus:outline-none"
+                    >
+                      Upgrade Now
+                    </button>
+                  )}
                   {remainingTrialDays > 3 && (
                     <button
                       onClick={() => {
@@ -546,12 +550,14 @@ export default function DashboardLayout() {
                   day: "numeric",
                 })}).
               </span>
-              <button
-                onClick={() => navigate("/upgrade")}
-                className="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-full text-xs transition-colors border border-white/30 backdrop-blur-sm shadow-sm"
-              >
-                Manage Billing
-              </button>
+              {location.pathname !== "/upgrade" && (
+                <button
+                  onClick={() => navigate("/upgrade")}
+                  className="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-full text-xs transition-colors border border-white/30 backdrop-blur-sm shadow-sm"
+                >
+                  Manage Billing
+                </button>
+              )}
             </div>
           )}
 

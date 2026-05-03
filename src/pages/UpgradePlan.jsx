@@ -168,12 +168,12 @@ export default function UpgradePlan() {
 
       <div className="text-center mb-12">
         <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">
-          Unlock Full Access
+          {paidSubscriptionActive ? "Manage Your Subscription" : "Unlock Full Access"}
         </h1>
         <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-          Start with a 14-day free trial, then continue with a paid
-          subscription for unlimited patients, automated reminders, and
-          advanced analytics.
+          {paidSubscriptionActive 
+            ? "You are currently subscribed to the Professional plan. You have full access to unlimited patients, automated reminders, and advanced analytics."
+            : "Start with a 14-day free trial, then continue with a paid subscription for unlimited patients, automated reminders, and advanced analytics."}
         </p>
         {trialing && (
           <p className="mt-4 text-sm inline-flex items-center gap-2 font-medium text-primary-700 bg-primary-50 px-4 py-1.5 rounded-full border border-primary-100 shadow-sm">
@@ -255,22 +255,23 @@ export default function UpgradePlan() {
             </span>
           </div>
 
-          <Button
-            className="w-full py-4 text-base font-bold bg-primary-500 hover:bg-primary-400 text-white shadow-[0_0_20px_rgba(14,165,233,0.3)] border-transparent"
-            onClick={handleUpgradeClick}
-            isLoading={checkoutLoading}
-          >
-            {paidSubscriptionActive
-              ? "Update Payment Method"
-              : trialing
+          {!paidSubscriptionActive && (
+            <Button
+              className="w-full py-4 text-base font-bold bg-primary-500 hover:bg-primary-400 text-white shadow-[0_0_20px_rgba(14,165,233,0.3)] border-transparent"
+              onClick={handleUpgradeClick}
+              isLoading={checkoutLoading}
+            >
+              {trialing
                 ? "Start Paid Subscription"
                 : "Subscribe Now"}
-          </Button>
+            </Button>
+          )}
 
           <div className="mt-5 mb-5 flex justify-center items-center">
             <p className="text-slate-600 text-xs font-medium bg-white px-4 py-2 rounded-xl border border-slate-200 text-center leading-relaxed">
-              New clinics begin with a 14-day trial, then continue with
-              secure recurring billing in NGN.
+              {paidSubscriptionActive
+                ? "Your subscription is currently active with secure recurring billing in NGN."
+                : "New clinics begin with a 14-day trial, then continue with secure recurring billing in NGN."}
             </p>
           </div>
 

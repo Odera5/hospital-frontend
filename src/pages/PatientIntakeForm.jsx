@@ -139,10 +139,14 @@ export default function PatientIntakeForm() {
 
   const isStepValid = () => {
     if (currentStep === 1) {
-      return form.name.trim() !== "" && form.age.trim() !== "";
+      const ageNum = parseInt(form.age, 10);
+      const isAgeValid = !isNaN(ageNum) && ageNum >= 0 && ageNum <= 120;
+      return form.name.trim() !== "" && form.age.trim() !== "" && isAgeValid;
     }
     if (currentStep === 2) {
-      return form.phone.trim() !== "";
+      const isPhoneValid = form.phone.trim() !== "" && /^[0-9+\-() ]*$/.test(form.phone);
+      const isEmailValid = form.email.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
+      return isPhoneValid && isEmailValid;
     }
     if (currentStep === 3) {
       return true; // Date/Time are optional, but good to have
